@@ -67,7 +67,7 @@ AudioBuffer<uint16_t>* audioBufferPtr = nullptr;
 #define OLED_CS_PIN 		GPIO_PIN::PIN_9
 
 // a simple class to handle lcd refresh events
-class Oled_Manager : public GlintLCDRefreshEventListener
+class Oled_Manager : public IGlintLCDRefreshEventListener
 {
 	public:
 		Oled_Manager (uint8_t* displayBuffer) :
@@ -304,11 +304,11 @@ int main(void)
 
 		uint16_t pot1Val = LLPD::adc_get_channel_value( EFFECT1_ADC_CHANNEL );
 		float pot1Percentage = static_cast<float>( pot1Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot1Percentage, static_cast<unsigned int>(POT_CHANNEL::DELAY_TIME)) );
+		IPotEventListener::PublishEvent( PotEvent(pot1Percentage, static_cast<unsigned int>(POT_CHANNEL::DECAY_TIME)) );
 
 		uint16_t pot2Val = LLPD::adc_get_channel_value( EFFECT2_ADC_CHANNEL );
 		float pot2Percentage = static_cast<float>( pot2Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::FEEDBACK)) );
+		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::MOD_RATE)) );
 
 		uint16_t pot3Val = LLPD::adc_get_channel_value( EFFECT3_ADC_CHANNEL );
 		float pot3Percentage = static_cast<float>( pot3Val ) * ( 1.0f / 4095.0f );

@@ -45,6 +45,10 @@
             file="../lib/SAL/include/AllpassCombFilter.hpp"/>
       <FILE id="D91QXN" name="AllpassCombFilter.cpp" compile="1" resource="0"
             file="../lib/SAL/src/AllpassCombFilter.cpp"/>
+      <FILE id="D9w2gN" name="SimpleDelay.hpp" compile="0" resource="0" file="../lib/SAL/include/SimpleDelay.hpp"/>
+      <FILE id="D9w2XN" name="SimpleDelay.cpp" compile="1" resource="0" file="../lib/SAL/src/SimpleDelay.cpp"/>
+      <FILE id="TFz2gN" name="PolyBLEPOsc.hpp" compile="0" resource="0" file="../lib/SAL/include/PolyBLEPOsc.hpp"/>
+      <FILE id="TFz2XN" name="PolyBLEPOsc.cpp" compile="1" resource="0" file="../lib/SAL/src/PolyBLEPOsc.cpp"/>
       <FILE id="qeuWpH" name="PresetManager.hpp" compile="0" resource="0"
             file="../lib/SAL/include/PresetManager.hpp"/>
       <FILE id="CUpz8d" name="SharedData.hpp" compile="0" resource="0" file="../lib/DevLib/include/SharedData.hpp"/>

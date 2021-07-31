@@ -4,15 +4,39 @@
 #include "AudioConstants.hpp"
 
 #ifdef TARGET_BUILD
-const unsigned int GLINT_DIFFUSE_LEN_1 = 59;
-const unsigned int GLINT_DIFFUSE_LEN_2 = 43;
-const unsigned int GLINT_DIFFUSE_LEN_3 = 157;
-const unsigned int GLINT_DIFFUSE_LEN_4 = 113;
+const unsigned int GLINT_DIFFUSE_LEN_1 = 113;
+const unsigned int GLINT_DIFFUSE_LEN_2 = 89;
+const unsigned int GLINT_DIFFUSE_LEN_3 = 313;
+const unsigned int GLINT_DIFFUSE_LEN_4 = 233;
 #else
-const unsigned int GLINT_DIFFUSE_LEN_1 = 139;
-const unsigned int GLINT_DIFFUSE_LEN_2 = 107;
-const unsigned int GLINT_DIFFUSE_LEN_3 = 379;
-const unsigned int GLINT_DIFFUSE_LEN_4 = 277;
+const unsigned int GLINT_DIFFUSE_LEN_1 = 277;
+const unsigned int GLINT_DIFFUSE_LEN_2 = 211;
+const unsigned int GLINT_DIFFUSE_LEN_3 = 757;
+const unsigned int GLINT_DIFFUSE_LEN_4 = 557;
+#endif
+
+#ifdef TARGET_BUILD
+const unsigned int GLINT_REVERBNET1_APF_LEN_1 = 557;
+const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 1487;
+const unsigned int GLINT_REVERBNET2_APF_LEN_1 = 751;
+const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 2203;
+const unsigned int GLINT_REVERBNET1_SD_LEN_1 = 3719;
+const unsigned int GLINT_REVERBNET1_SD_LEN_2 = 1487;
+const unsigned int GLINT_REVERBNET2_SD_LEN_1 = 3511;
+const unsigned int GLINT_REVERBNET2_SD_LEN_2 = 2203;
+const unsigned int GLINT_REVERBNET1_MODD_LEN = 7;
+const unsigned int GLINT_REVERBNET2_MODD_LEN = 13;
+#else                                                 // values for 48000kHz sample rate
+const unsigned int GLINT_REVERBNET1_APF_LEN_1 = 1327; // 673;
+const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 3571; // 1789;
+const unsigned int GLINT_REVERBNET2_APF_LEN_1 = 1811; // 907;
+const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 5281; // 2647;
+const unsigned int GLINT_REVERBNET1_SD_LEN_1 = 8923;  // 4451;
+const unsigned int GLINT_REVERBNET1_SD_LEN_2 = 3571;  // 1789;
+const unsigned int GLINT_REVERBNET2_SD_LEN_1 = 8431;  // 4217;
+const unsigned int GLINT_REVERBNET2_SD_LEN_2 = 5281;  // 2647;
+const unsigned int GLINT_REVERBNET1_MODD_LEN = 17;   // 227;
+const unsigned int GLINT_REVERBNET2_MODD_LEN = 31;   // 431;
 #endif
 
 const float GLINT_MAX_FILT_FREQ = 20000.0f;

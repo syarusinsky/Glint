@@ -77,6 +77,8 @@ OBJECTS_APP := \
   $(JUCE_OBJDIR)/FakeStorageDevice_f86b1aa0.o \
   $(JUCE_OBJDIR)/SoftClipper_cd2d93a3.o \
   $(JUCE_OBJDIR)/AllpassCombFilter_359c93cb.o \
+  $(JUCE_OBJDIR)/SimpleDelay_54cd5751.o \
+  $(JUCE_OBJDIR)/PolyBLEPOsc_ceb07cde.o \
   $(JUCE_OBJDIR)/ColorProfile_54fec7c1.o \
   $(JUCE_OBJDIR)/GlintManager_547bf0d2.o \
   $(JUCE_OBJDIR)/IGlintParameterEventListener_a3c00795.o \
@@ -160,6 +162,16 @@ $(JUCE_OBJDIR)/SoftClipper_cd2d93a3.o: ../../../lib/SAL/src/SoftClipper.cpp
 $(JUCE_OBJDIR)/AllpassCombFilter_359c93cb.o: ../../../lib/SAL/src/AllpassCombFilter.cpp
 	-$(V_AT)mkdir -p $(JUCE_OBJDIR)
 	@echo "Compiling AllpassCombFilter.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_APP) $(JUCE_CFLAGS_APP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/SimpleDelay_54cd5751.o: ../../../lib/SAL/src/SimpleDelay.cpp
+	-$(V_AT)mkdir -p $(JUCE_OBJDIR)
+	@echo "Compiling SimpleDelay.cpp"
+	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_APP) $(JUCE_CFLAGS_APP) -o "$@" -c "$<"
+
+$(JUCE_OBJDIR)/PolyBLEPOsc_ceb07cde.o: ../../../lib/SAL/src/PolyBLEPOsc.cpp
+	-$(V_AT)mkdir -p $(JUCE_OBJDIR)
+	@echo "Compiling PolyBLEPOsc.cpp"
 	$(V_AT)$(CXX) $(JUCE_CXXFLAGS) $(JUCE_CPPFLAGS_APP) $(JUCE_CFLAGS_APP) -o "$@" -c "$<"
 
 $(JUCE_OBJDIR)/ColorProfile_54fec7c1.o: ../../../lib/SIGL/src/ColorProfile.cpp

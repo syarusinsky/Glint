@@ -77,7 +77,7 @@ MainComponent::MainComponent() :
 	decayTimeLbl.attachToComponent( &decayTimeSldr, true );
 
 	addAndMakeVisible( modRateSldr );
-	modRateSldr.setRange( 0, 99 );
+	modRateSldr.setRange( 0.0f, 1.0f );
 	modRateSldr.setTextValueSuffix( "%" );
 	modRateSldr.addListener( this );
 	addAndMakeVisible( modRateLbl );
@@ -86,6 +86,7 @@ MainComponent::MainComponent() :
 
 	addAndMakeVisible( filtFreqSldr );
 	filtFreqSldr.setRange( 1, 20000 );
+	filtFreqSldr.setValue( 20000, juce::dontSendNotification );
 	filtFreqSldr.setTextValueSuffix( "Hz" );
 	filtFreqSldr.addListener( this );
 	addAndMakeVisible( filtFreqLbl );
