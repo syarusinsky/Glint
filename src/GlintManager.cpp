@@ -8,7 +8,7 @@
 
 unsigned int GlintSimpleDelay::m_RunningDelayLineOffset = 0;
 
-GlintManager::GlintManager (IStorageMedia* delayBufferStorage) :
+GlintManager::GlintManager (STORAGE* delayBufferStorage) :
 	m_StorageMedia( delayBufferStorage ),
 	m_StorageMediaSize( (Sram_23K256::SRAM_SIZE * 4) / sizeof(uint16_t) ), // size of 4 srams installed on Gen_FX_SYN rev 2
 	m_DecayTime( 0.0f ),
@@ -71,15 +71,20 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_ReverbNet2APF2.setFeedbackGain( m_DecayTime );
 
 	// get the sine wave values for modulation
-	// m_ReverbNetModOsc.setFrequency( m_ModRate );
-	// float modVals[ABUFFER_SIZE];
-	// m_ReverbNetModOsc.call( modVals );
+	/*
+	m_ReverbNetModOsc.setFrequency( m_ModRate );
+	float modVals[ABUFFER_SIZE];
+	m_ReverbNetModOsc.call( modVals );
+	*/
 
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
 		int16_t sampleVal = static_cast<int16_t>( writeBuffer[sample] ) - 2048;
 
+		sampleVal = m_ReverbNet1SD1.processSample( sampleVal );
+
 		/*
+		// TODO using this to test target
 		// diffusion stage
 		sampleVal = m_DiffusionAPF1.processSample( sampleVal );
 		sampleVal = m_DiffusionAPF2.processSample( sampleVal );
@@ -100,15 +105,15 @@ void GlintManager::call (uint16_t* writeBuffer)
 		int16_t sampleValL = static_cast<int16_t>( std::round(sampleValFL) );
 		int16_t sampleValR = static_cast<int16_t>( std::round(sampleValFR) );
 		sampleValL = m_ReverbNet1APF1.processSample( sampleValL );
-		sampleValL = m_ReverbNet1SD1.processSample( sampleValL );
-		// sampleValL = m_ReverbNet1APF2.processSample( sampleValL );
+		// sampleValL = m_ReverbNet1SD1.processSample( sampleValL );
+		sampleValL = m_ReverbNet1APF2.processSample( sampleValL );
 		// sampleValL = m_ReverbNet1SD2.processSample( sampleValL );
 		// sampleValL = m_ReverbNet1ModD.processSample( sampleValL );
 		m_PrevReverbNet1Val = static_cast<float>( sampleValL ) * m_DecayTime;
 		sampleValL = static_cast<int16_t>( m_PrevReverbNet1Val );
 		sampleValR = m_ReverbNet2APF1.processSample( sampleValR );
-		sampleValR = m_ReverbNet2SD1.processSample( sampleValR );
-		// sampleValR = m_ReverbNet2APF2.processSample( sampleValR );
+		// sampleValR = m_ReverbNet2SD1.processSample( sampleValR );
+		sampleValR = m_ReverbNet2APF2.processSample( sampleValR );
 		// sampleValR = m_ReverbNet2SD2.processSample( sampleValR );
 		// sampleValR = m_ReverbNet2ModD.processSample( sampleValR );
 		m_PrevReverbNet2Val = static_cast<float>( sampleValR ) * m_DecayTime;
@@ -118,9 +123,47 @@ void GlintManager::call (uint16_t* writeBuffer)
 		sampleVal = static_cast<int16_t>( (m_PrevReverbNet1Val + m_PrevReverbNet2Val) * 0.5f );
 		*/
 
-		sampleVal = m_ReverbNet1SD1.processSample( sampleVal );
+		/*
+		// TODO using this to test host
+		// diffusion stage
+		sampleVal = m_DiffusionAPF1.processSample( sampleVal );
+		sampleVal = m_DiffusionAPF2.processSample( sampleVal );
+		sampleVal = m_DiffusionAPF3.processSample( sampleVal );
+		sampleVal = m_DiffusionAPF4.processSample( sampleVal );
 
-		writeBuffer[sample] = static_cast<uint16_t>( sampleVal + 2048 ); // +2048 to turn it back into a uint16_t
+		// feedback and cross stage
+		float sampleValFL = ( static_cast<float>(sampleVal) + m_PrevReverbNet2Val ) * 0.5f;
+		float sampleValFR = ( static_cast<float>(sampleVal) + m_PrevReverbNet1Val ) * 0.5f;
+
+		// lowpass stage
+		sampleValFL = m_LowpassFilter1.processSample( sampleValFL );
+		sampleValFR = m_LowpassFilter2.processSample( sampleValFR );
+
+		// reverberation network stage
+		m_ReverbNet1ModD.setDelayLength( GLINT_REVERBNET1_MODD_LEN * ((modVals[sample] * 0.5f) + 1.0f) );
+		m_ReverbNet2ModD.setDelayLength( GLINT_REVERBNET2_MODD_LEN * ((modVals[sample] * 0.5f) + 1.0f) );
+		int16_t sampleValL = static_cast<int16_t>( std::round(sampleValFL) );
+		int16_t sampleValR = static_cast<int16_t>( std::round(sampleValFR) );
+		sampleValL = m_ReverbNet1APF1.processSample( sampleValL );
+		sampleValL = m_ReverbNet1SD1.processSample( sampleValL );
+		sampleValL = m_ReverbNet1APF2.processSample( sampleValL );
+		sampleValL = m_ReverbNet1SD2.processSample( sampleValL );
+		sampleValL = m_ReverbNet1ModD.processSample( sampleValL );
+		m_PrevReverbNet1Val = static_cast<float>( sampleValL ) * m_DecayTime;
+		sampleValL = static_cast<int16_t>( m_PrevReverbNet1Val );
+		sampleValR = m_ReverbNet2APF1.processSample( sampleValR );
+		sampleValR = m_ReverbNet2SD1.processSample( sampleValR );
+		sampleValR = m_ReverbNet2APF2.processSample( sampleValR );
+		sampleValR = m_ReverbNet2SD2.processSample( sampleValR );
+		sampleValR = m_ReverbNet2ModD.processSample( sampleValR );
+		m_PrevReverbNet2Val = static_cast<float>( sampleValR ) * m_DecayTime;
+		sampleValR = static_cast<int16_t>( m_PrevReverbNet2Val );
+
+		// summing stage
+		sampleVal = static_cast<int16_t>( (m_PrevReverbNet1Val + m_PrevReverbNet2Val) * 0.5f );
+		*/
+
+		writeBuffer[sample] = static_cast<uint16_t>( sampleVal ) + 2048; // +2048 to turn it back into a uint16_t
 	}
 }
 

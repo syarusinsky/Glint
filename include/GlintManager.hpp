@@ -12,11 +12,19 @@
 
 #include <stdint.h>
 
+#ifdef TARGET_BUILD
+	#define STORAGE Sram_23K256_Manager
+	#include "SRAM_23K256.hpp"
+#else
+	#define STORAGE FakeStorageDevice
+	#include "FakeStorageDevice.hpp"
+#endif
+
 // this simple delay uses IStorageMedia as opposed to an array
 class GlintSimpleDelay
 {
 	public:
-		GlintSimpleDelay (IStorageMedia* delayBufferStorage, unsigned int maxDelayLength, unsigned int delayLength, int16_t initVal) :
+		GlintSimpleDelay (STORAGE* delayBufferStorage, unsigned int maxDelayLength, unsigned int delayLength, int16_t initVal) :
 			m_DelayLength( maxDelayLength + 1 ), // plus one because one sample is no delay
 			m_DelayBuffer( delayBufferStorage ),
 			m_DelayWriteIncr( 0 ),
@@ -42,17 +50,16 @@ class GlintSimpleDelay
 		{
 			// read delayed value
 			unsigned int readOffset = ( m_DelayLineOffset + m_DelayReadIncr ) * sizeof(int16_t);
-			SharedData<uint8_t> delayedData = m_DelayBuffer->readFromMedia( 1 * sizeof(int16_t), readOffset );
-			int16_t* delayedDataPtr = reinterpret_cast<int16_t*>( delayedData.getPtr() );
-			int16_t delayedVal = delayedDataPtr[0];
+			uint8_t readByte1 = m_DelayBuffer->readByte( readOffset );
+			uint8_t readByte2 = m_DelayBuffer->readByte( readOffset + 1 );
+			int16_t delayedVal = ( readByte1 << 8 ) | ( readByte2 );
 
 			// write current sample value
-			SharedData<uint8_t> writeData = SharedData<uint8_t>::MakeSharedData( 1 * sizeof(int16_t) );
-			int16_t* writeDataPtr = reinterpret_cast<int16_t*>( writeData.getPtr() );
-			writeDataPtr[0] = sampleVal;
-
 			unsigned int writeOffset = ( m_DelayLineOffset + m_DelayWriteIncr ) * sizeof(int16_t);
-			m_DelayBuffer->writeToMedia( writeData, writeOffset );
+			uint8_t writeByte1 = ( sampleVal >> 8 );
+			uint8_t writeByte2 = ( sampleVal & 0b11111111 );
+			m_DelayBuffer->writeByte( writeOffset, writeByte1 );
+			m_DelayBuffer->writeByte( writeOffset + 1, writeByte2 );
 
 			m_DelayWriteIncr = ( m_DelayWriteIncr + 1 ) % m_DelayLength;
 			m_DelayReadIncr = ( m_DelayReadIncr + 1 ) % m_DelayLength;
@@ -67,7 +74,7 @@ class GlintSimpleDelay
 
 	private:
 		unsigned int 	m_DelayLength;
-		IStorageMedia* 	m_DelayBuffer;
+		STORAGE* 	m_DelayBuffer;
 		unsigned int 	m_DelayWriteIncr;
 		unsigned int 	m_DelayReadIncr;
 		unsigned int 	m_DelayLineOffset; // since we're using one contiguous storage device, offset each delay
@@ -77,7 +84,7 @@ class GlintSimpleDelay
 class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEventListener
 {
 	public:
-		GlintManager (IStorageMedia* delayBufferStorage);
+		GlintManager (STORAGE* delayBufferStorage);
 		~GlintManager() override;
 
 		void setDecayTime (float decayTime); // decayTime should be between 0.0f and 1.0f
@@ -89,7 +96,7 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		void onGlintParameterEvent (const GlintParameterEvent& paramEvent) override;
 
 	private:
-		IStorageMedia* 			m_StorageMedia; // where the static delay buffers sit
+		STORAGE* 			m_StorageMedia; // where the static delay buffers sit
 		unsigned int 			m_StorageMediaSize;
 
 		float 				m_DecayTime;

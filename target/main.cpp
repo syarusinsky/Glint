@@ -258,7 +258,6 @@ int main(void)
 	{
 		LLPD::usart_log( USART_NUM::USART_3, "WARNING!!! srams failed verification..." );
 	}
-	srams.setSequentialMode( true );
 
 	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
 
@@ -326,7 +325,9 @@ extern "C" void TIM6_DAC_IRQHandler (void)
 		{
 			uint16_t adcVal = LLPD::adc_get_channel_value( ADC_CHANNEL::CHAN_4 );
 
-			LLPD::dac_send( audioBufferPtr->getNextSample(adcVal) );
+			uint16_t outVal = audioBufferPtr->getNextSample( adcVal );
+
+			LLPD::dac_send( outVal );
 
 			LLPD::adc_perform_conversion_sequence();
 		}
