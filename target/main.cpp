@@ -258,6 +258,7 @@ int main(void)
 	{
 		LLPD::usart_log( USART_NUM::USART_3, "WARNING!!! srams failed verification..." );
 	}
+	srams.setSequentialMode( true );
 
 	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
 
