@@ -1,0 +1,33 @@
+import("stdfaust.lib");
+
+// constants
+diffusion = 0.913;
+mod1DelayMax = 227;
+mod2DelayMax = 431;
+
+// sliders
+decaySlider = hslider( "Decay", 0.5, 0.0, 1.0, 0.001 );
+modRateSlider = hslider( "Mod Freq", 0.01, 0.01, 1.0, 0.001 );
+filterFreqSlider = hslider( "Filt Freq", 20000.0, 1.0, 20000.0, 0.001 );
+drySlider = hslider( "Dry", 0.5, 0.0, 0.5, 0.001 );
+wetSlider = hslider( "Wet", 0.5, 0.0, 0.5, 0.001 );
+
+// basic all-pass filter
+allpass( delayLen, feedbackGain ) = ( + : _ <: @(delayLen - 1), *(-feedbackGain) ) ~ * (feedbackGain) : mem, _ :> +;
+
+// diffusion network algorithm
+diffusionNetwork = allpass( 139, diffusion ) : allpass( 107, diffusion ) : allpass( 379, diffusion ) : allpass( 277, diffusion );
+
+// modulated delay
+modDelay( maxDelay ) = de.delay( maxDelay, ((os.oscsin(modRateSlider) / 2.0) + 1.0) * maxDelay - 1 );
+
+// reverb network block algorithms
+reverbNetworkBlock1 = allpass( 673, decaySlider ) : @(4451) : allpass( 1789, decaySlider ) : @(1789) : modDelay( mod1DelayMax ) : _ * decaySlider;
+reverbNetworkBlock2 = allpass(  907, decaySlider ) : @(4217) : allpass( 2647, decaySlider ) : @(2647) : modDelay( mod2DelayMax ) : _ * decaySlider;
+reverbNetwork = reverbNetworkBlock1, reverbNetworkBlock2;  
+
+// reverbed sound
+wetSound = diffusionNetwork <: ((si.bus(4) :> _,_ : fi.lowpass(1,filterFreqSlider), fi.lowpass(1,filterFreqSlider)) ~ (reverbNetwork : ro.cross(2)));
+
+// main process
+process = _ <: (_,_ * drySlider), (_,_ :> (wetSound : fi.highpass(4, 20.0), fi.highpass(4, 20.0) : (_ * wetSlider), (_ * wetSlider))) :> _, _;

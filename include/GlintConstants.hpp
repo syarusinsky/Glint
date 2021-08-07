@@ -35,8 +35,8 @@ const unsigned int GLINT_REVERBNET1_SD_LEN_1 = 8923;  // 4451;
 const unsigned int GLINT_REVERBNET1_SD_LEN_2 = 3571;  // 1789;
 const unsigned int GLINT_REVERBNET2_SD_LEN_1 = 8431;  // 4217;
 const unsigned int GLINT_REVERBNET2_SD_LEN_2 = 5281;  // 2647;
-const unsigned int GLINT_REVERBNET1_MODD_LEN = 17;   // 227;
-const unsigned int GLINT_REVERBNET2_MODD_LEN = 31;   // 431;
+const unsigned int GLINT_REVERBNET1_MODD_LEN = 17;    // 227;
+const unsigned int GLINT_REVERBNET2_MODD_LEN = 31;    // 431;
 #endif
 
 const float GLINT_MAX_FILT_FREQ = 20000.0f;

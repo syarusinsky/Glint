@@ -119,6 +119,52 @@ MainComponent::MainComponent() :
 	this->bindToGlintLCDRefreshEventSystem();
 
 	glintUiManager.draw();
+
+	/* small test showing that random numbers between -1.0f and 1.0f gives a gain between 1.0f and 2.0f
+	unsigned int iterations = 10000000;
+	AllpassCombFilter<float> apComb( 2, 0.5f, 0.0f );
+	float max = 0.0f;
+	float min = 0.0f;
+	for ( unsigned int sample = 0; sample < iterations; sample++ )
+	{
+		float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		r = ( r * 2.0f ) - 1.0f;
+		float sampleVal = apComb.processSample( r );
+		if ( sampleVal > max ) max = sampleVal;
+		if ( sampleVal < min ) min = sampleVal;
+	}
+
+	std::cout << "max: " << std::to_string(max) << std::endl;
+	std::cout << "min: " << std::to_string(min) << std::endl;
+	*/
+
+	/* small test to verify gain of allpass filter (but since this is a trivial example, it isn't accurate, see above)
+	unsigned int iterations = 1000;
+	AllpassCombFilter<float> apComb( 2, 0.5f, 0.0f );
+	float max = 0.0f;
+	float min = 0.0f;
+	for ( unsigned int sample = 0; sample < iterations; sample++ )
+	{
+		float sampleVal = apComb.processSample( 1.0f );
+		if ( sampleVal > max ) max = sampleVal;
+		if ( sampleVal < min ) min = sampleVal;
+	}
+	for ( unsigned int sample = 0; sample < iterations; sample++ )
+	{
+		float sampleVal = apComb.processSample( 0.0f );
+		if ( sampleVal > max ) max = sampleVal;
+		if ( sampleVal < min ) min = sampleVal;
+	}
+	for ( unsigned int sample = 0; sample < iterations; sample++ )
+	{
+		float sampleVal = apComb.processSample( -1.0f );
+		if ( sampleVal > max ) max = sampleVal;
+		if ( sampleVal < min ) min = sampleVal;
+	}
+
+	std::cout << "max: " << std::to_string(max) << std::endl;
+	std::cout << "min: " << std::to_string(min) << std::endl;
+	*/
 }
 
 MainComponent::~MainComponent()
