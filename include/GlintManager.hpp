@@ -185,24 +185,20 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		AllpassCombFilter<int16_t> 	m_DiffusionAPF4;
 
 		// low-pass filters
-		OnePoleFilter<int16_t> 		m_LowpassFilter1;
-		OnePoleFilter<int16_t> 		m_LowpassFilter2;
+		OnePoleFilter<int16_t> 		m_LowpassFilter;
 
 		// reverberation network filters
 		PolyBLEPOsc 			m_ReverbNetModOsc;
-		AllpassCombFilter<int16_t> 	m_ReverbNet1APF1;
-		GlintSimpleDelay 		m_ReverbNet1SD1;
-		AllpassCombFilter<int16_t> 	m_ReverbNet1APF2;
-		GlintSimpleDelay 		m_ReverbNet1SD2;
-		SimpleDelay<int16_t> 		m_ReverbNet1ModD;
-		AllpassCombFilter<int16_t> 	m_ReverbNet2APF1;
-		GlintSimpleDelay 		m_ReverbNet2SD1;
-		AllpassCombFilter<int16_t> 	m_ReverbNet2APF2;
-		GlintSimpleDelay 		m_ReverbNet2SD2;
-		SimpleDelay<int16_t> 		m_ReverbNet2ModD;
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock1APF1;
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock1APF2;
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock1APF3;
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF1;
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF2;
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF3;
+		SimpleDelay<int16_t> 		m_ReverbNetSimpleDelay;
 
-		int16_t 			m_PrevReverbNet1Vals[ABUFFER_SIZE]; // for feedback
-		int16_t 			m_PrevReverbNet2Vals[ABUFFER_SIZE];
+		int16_t 			m_PrevReverbNetVals[ABUFFER_SIZE]; // for feedback into low-pass
+		int16_t 			m_PrevReverbNetBlock2Vals[ABUFFER_SIZE]; // for feedback into reverb block 1
 
 };
 

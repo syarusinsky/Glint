@@ -21,7 +21,7 @@ diffusionNetwork = allpass( 139, diffusion ) : allpass( 107, diffusion ) : allpa
 // reverb network block algorithms
 reverbNetworkBlock1 = allpass( 673, decaySlider ) : allpass( 1789, decaySlider ) : allpass( 1231, decaySlider ) : _;
 reverbNetworkBlock2 = allpass(  907, decaySlider ) : allpass( 2647, decaySlider ) : allpass( 1571, decaySlider ) : _;
-reverbNetwork = _ : ((si.bus(2) :> (_ - _) / 2 : reverbNetworkBlock1) ~ (@(7219) : reverbNetworkBlock2)) : _ * decaySlider;
+reverbNetwork = _ : ((si.bus(2) :> (_ - _) / 2 : reverbNetworkBlock1) ~ (@(4451) : reverbNetworkBlock2)) : _ * decaySlider;
 
 // reverbed sound
 wetSound = (si.bus(2) :> _ : fi.lowpass(1, filterFreqSlider) : diffusionNetwork) ~ reverbNetwork <: _, _;

@@ -18,25 +18,19 @@ const unsigned int GLINT_DIFFUSE_LEN_4 = 557;
 #ifdef TARGET_BUILD
 const unsigned int GLINT_REVERBNET1_APF_LEN_1 = 557;
 const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 1487;
+const unsigned int GLINT_REVERBNET1_APF_LEN_3 = 1021;
 const unsigned int GLINT_REVERBNET2_APF_LEN_1 = 751;
 const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 2203;
-const unsigned int GLINT_REVERBNET1_SD_LEN_1 = 3719;
-const unsigned int GLINT_REVERBNET1_SD_LEN_2 = 1487;
-const unsigned int GLINT_REVERBNET2_SD_LEN_1 = 3511;
-const unsigned int GLINT_REVERBNET2_SD_LEN_2 = 2203;
-const unsigned int GLINT_REVERBNET1_MODD_LEN = 7;
-const unsigned int GLINT_REVERBNET2_MODD_LEN = 13;
+const unsigned int GLINT_REVERBNET2_APF_LEN_3 = 1307;
+const unsigned int GLINT_REVERBNET_SD_LEN     = 3719;
 #else                                                 // values for 48000kHz sample rate
 const unsigned int GLINT_REVERBNET1_APF_LEN_1 = 1327; // 673;
 const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 3571; // 1789;
+const unsigned int GLINT_REVERBNET1_APF_LEN_3 = 2459; // 1231;
 const unsigned int GLINT_REVERBNET2_APF_LEN_1 = 1811; // 907;
 const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 5281; // 2647;
-const unsigned int GLINT_REVERBNET1_SD_LEN_1 = 8923;  // 4451;
-const unsigned int GLINT_REVERBNET1_SD_LEN_2 = 3571;  // 1789;
-const unsigned int GLINT_REVERBNET2_SD_LEN_1 = 8431;  // 4217;
-const unsigned int GLINT_REVERBNET2_SD_LEN_2 = 5281;  // 2647;
-const unsigned int GLINT_REVERBNET1_MODD_LEN = 17;    // 227;
-const unsigned int GLINT_REVERBNET2_MODD_LEN = 31;    // 431;
+const unsigned int GLINT_REVERBNET2_APF_LEN_3 = 3137; // 1571;
+const unsigned int GLINT_REVERBNET_SD_LEN     = 8923;  // 4451;
 #endif
 
 const float GLINT_MAX_FILT_FREQ = 20000.0f;

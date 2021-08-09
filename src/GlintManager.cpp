@@ -19,21 +19,17 @@ GlintManager::GlintManager (STORAGE* delayBufferStorage) :
 	m_DiffusionAPF2( GLINT_DIFFUSE_LEN_2, m_Diffusion, 0 ),
 	m_DiffusionAPF3( GLINT_DIFFUSE_LEN_3, m_Diffusion, 0 ),
 	m_DiffusionAPF4( GLINT_DIFFUSE_LEN_4, m_Diffusion, 0 ),
-	m_LowpassFilter1(),
-	m_LowpassFilter2(),
+	m_LowpassFilter(),
 	m_ReverbNetModOsc(),
-	m_ReverbNet1APF1( GLINT_REVERBNET1_APF_LEN_1, m_DecayTime, 0 ),
-	m_ReverbNet1SD1( delayBufferStorage, GLINT_REVERBNET1_SD_LEN_1, GLINT_REVERBNET1_SD_LEN_1, 0 ),
-	m_ReverbNet1APF2( GLINT_REVERBNET1_APF_LEN_2, m_DecayTime, 0 ),
-	m_ReverbNet1SD2( delayBufferStorage, GLINT_REVERBNET1_SD_LEN_2, GLINT_REVERBNET1_SD_LEN_2, 0 ),
-	m_ReverbNet1ModD( GLINT_REVERBNET1_MODD_LEN, GLINT_REVERBNET1_MODD_LEN, 0 ),
-	m_ReverbNet2APF1( GLINT_REVERBNET2_APF_LEN_1, m_DecayTime, 0 ),
-	m_ReverbNet2SD1( delayBufferStorage, GLINT_REVERBNET2_SD_LEN_1, GLINT_REVERBNET2_SD_LEN_1, 0 ),
-	m_ReverbNet2APF2( GLINT_REVERBNET2_APF_LEN_2, m_DecayTime, 0 ),
-	m_ReverbNet2SD2( delayBufferStorage, GLINT_REVERBNET2_SD_LEN_2, GLINT_REVERBNET2_SD_LEN_2, 0 ),
-	m_ReverbNet2ModD( GLINT_REVERBNET2_MODD_LEN, GLINT_REVERBNET2_MODD_LEN, 0 ),
-	m_PrevReverbNet1Vals{ 0 },
-	m_PrevReverbNet2Vals{ 0 }
+	m_ReverbNetBlock1APF1( GLINT_REVERBNET1_APF_LEN_1, m_DecayTime, 0 ),
+	m_ReverbNetBlock1APF2( GLINT_REVERBNET1_APF_LEN_2, m_DecayTime, 0 ),
+	m_ReverbNetBlock1APF3( GLINT_REVERBNET1_APF_LEN_3, m_DecayTime, 0 ),
+	m_ReverbNetBlock2APF1( GLINT_REVERBNET2_APF_LEN_1, m_DecayTime, 0 ),
+	m_ReverbNetBlock2APF2( GLINT_REVERBNET2_APF_LEN_2, m_DecayTime, 0 ),
+	m_ReverbNetBlock2APF3( GLINT_REVERBNET2_APF_LEN_3, m_DecayTime, 0 ),
+	m_ReverbNetSimpleDelay( GLINT_REVERBNET_SD_LEN, GLINT_REVERBNET_SD_LEN, 0 ),
+	m_PrevReverbNetVals{ 0 },
+	m_PrevReverbNetBlock2Vals{ 0 }
 {
 	this->bindToGlintParameterEventSystem();
 
@@ -62,27 +58,30 @@ void GlintManager::setFiltFreq (float filtFreq)
 
 void GlintManager::call (uint16_t* writeBuffer)
 {
-	m_LowpassFilter1.setCoefficients( m_FiltFreq );
-	m_LowpassFilter2.setCoefficients( m_FiltFreq );
+	m_LowpassFilter.setCoefficients( m_FiltFreq );
 
-	m_ReverbNet1APF1.setFeedbackGain( m_DecayTime );
-	m_ReverbNet1APF2.setFeedbackGain( m_DecayTime );
-	m_ReverbNet2APF1.setFeedbackGain( m_DecayTime );
-	m_ReverbNet2APF2.setFeedbackGain( m_DecayTime );
+	m_ReverbNetBlock1APF1.setFeedbackGain( m_DecayTime );
+	m_ReverbNetBlock1APF2.setFeedbackGain( m_DecayTime );
+	m_ReverbNetBlock2APF1.setFeedbackGain( m_DecayTime );
+	m_ReverbNetBlock2APF2.setFeedbackGain( m_DecayTime );
 
 	// get the sine wave values for modulation
 	// m_ReverbNetModOsc.setFrequency( m_ModRate );
 	// float modVals[ABUFFER_SIZE];
 	// m_ReverbNetModOsc.call( modVals );
 
-	// offset samples to maximize headroom
+	// offset samples to maximize headroom and feedback from reverb network
 	const unsigned int scaleFactor = 1;
 	int16_t* sampleVals = reinterpret_cast<int16_t*>( writeBuffer );
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
 		sampleVals[sample] -= 2048;
 		sampleVals[sample] *= scaleFactor;
+		sampleVals[sample] += m_PrevReverbNetVals[sample];
 	}
+
+	// lowpass stage
+	m_LowpassFilter.call( sampleVals );
 
 	// diffusion stage
 	m_DiffusionAPF1.call( sampleVals );
@@ -90,41 +89,30 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_DiffusionAPF3.call( sampleVals );
 	m_DiffusionAPF4.call( sampleVals );
 
-	// feedback and cross stage
-	int16_t sampleValsL[ABUFFER_SIZE] = { 0 };
-	int16_t sampleValsR[ABUFFER_SIZE] = { 0 };
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-	{
-		sampleValsL[sample] = ( sampleVals[sample] + m_PrevReverbNet2Vals[sample] ) / 2;
-	}
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-	{
-		sampleValsR[sample] = ( sampleVals[sample] + m_PrevReverbNet1Vals[sample] ) / 2;
-	}
+	// sample vals will be the actual output, but we also need to calculate the reverb net output values for feedback
+	memcpy( m_PrevReverbNetVals, sampleVals, ABUFFER_SIZE * sizeof(int16_t) );
 
-	// lowpass stage
-	m_LowpassFilter1.call( sampleValsL );
-	m_LowpassFilter2.call( sampleValsR );
+	// feedback from reverb network block 2
+	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+	{
+		m_PrevReverbNetVals[sample] = ( m_PrevReverbNetVals[sample] - m_PrevReverbNetBlock2Vals[sample] ) / 2;
+	}
 
 	// reverberation network stage
-	m_ReverbNet1APF1.call( sampleValsL );
-	m_ReverbNet1SD1.call(  sampleValsL );
-	m_ReverbNet1APF2.call( sampleValsL );
-	m_ReverbNet1SD2.call(  sampleValsL );
-	m_ReverbNet2APF1.call( sampleValsR );
-	m_ReverbNet2SD1.call(  sampleValsR );
-	m_ReverbNet2APF2.call( sampleValsR );
-	m_ReverbNet2SD2.call(  sampleValsR );
+	m_ReverbNetBlock1APF1.call( m_PrevReverbNetVals );
+	m_ReverbNetBlock1APF2.call( m_PrevReverbNetVals );
+	m_ReverbNetBlock1APF3.call( m_PrevReverbNetVals );
+	// decay the reverb network samples
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		m_PrevReverbNet1Vals[sample] = sampleValsL[sample] * m_DecayTime;
-		m_PrevReverbNet2Vals[sample] = sampleValsR[sample] * m_DecayTime;
-		sampleValsL[sample] = m_PrevReverbNet1Vals[sample];
-		sampleValsR[sample] = m_PrevReverbNet2Vals[sample];
-
-		// summing
-		sampleVals[sample] = ( sampleValsL[sample] + sampleValsR[sample] ) / 2;
+		m_PrevReverbNetVals[sample] *= m_DecayTime;
 	}
+	// m_PrevReverbNetVals will be the actual output of the reverb network stage, but we also need to calculate the second block for feedback
+	memcpy( m_PrevReverbNetBlock2Vals, m_PrevReverbNetVals, ABUFFER_SIZE * sizeof(int16_t) );
+	m_ReverbNetSimpleDelay.call( m_PrevReverbNetBlock2Vals );
+	m_ReverbNetBlock2APF1.call( m_PrevReverbNetBlock2Vals );
+	m_ReverbNetBlock2APF2.call( m_PrevReverbNetBlock2Vals );
+	m_ReverbNetBlock2APF3.call( m_PrevReverbNetBlock2Vals );
 
 	// offset samples to fit into dac range
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
