@@ -26,8 +26,9 @@ GlintManager::GlintManager (STORAGE* delayBufferStorage) :
 	m_ReverbNetBlock1APF3( GLINT_REVERBNET1_APF_LEN_3, m_DecayTime, 0 ),
 	m_ReverbNetBlock2APF1( GLINT_REVERBNET2_APF_LEN_1, m_DecayTime, 0 ),
 	m_ReverbNetBlock2APF2( GLINT_REVERBNET2_APF_LEN_2, m_DecayTime, 0 ),
-	m_ReverbNetBlock2APF3( GLINT_REVERBNET2_APF_LEN_3, m_DecayTime, 0 ),
+	m_ReverbNetBlock2APF3( GLINT_REVERBNET2_APF_LEN_3 + GLINT_REVERBNET_MOD_DEPTH, m_DecayTime, 0 ),
 	m_ReverbNetSimpleDelay( GLINT_REVERBNET_SD_LEN, GLINT_REVERBNET_SD_LEN, 0 ),
+	m_ModVals{ 0.0f },
 	m_PrevReverbNetVals{ 0 },
 	m_PrevReverbNetBlock2Vals{ 0 }
 {
@@ -62,13 +63,18 @@ void GlintManager::call (uint16_t* writeBuffer)
 
 	m_ReverbNetBlock1APF1.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock1APF2.setFeedbackGain( m_DecayTime );
+	m_ReverbNetBlock1APF3.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock2APF1.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock2APF2.setFeedbackGain( m_DecayTime );
+	m_ReverbNetBlock2APF3.setFeedbackGain( m_DecayTime );
 
 	// get the sine wave values for modulation
-	// m_ReverbNetModOsc.setFrequency( m_ModRate );
-	// float modVals[ABUFFER_SIZE];
-	// m_ReverbNetModOsc.call( modVals );
+	m_ReverbNetModOsc.setFrequency( m_ModRate );
+	m_ReverbNetModOsc.call( m_ModVals );
+	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+	{
+		m_ModVals[sample] = ( m_ModVals[sample] + 1.0f ) * 0.5f; // to get to range 0.0f to 1.0f
+	}
 
 	// offset samples to maximize headroom and feedback from reverb network
 	const unsigned int scaleFactor = 1;
@@ -95,7 +101,8 @@ void GlintManager::call (uint16_t* writeBuffer)
 	// feedback from reverb network block 2
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		m_PrevReverbNetVals[sample] = ( m_PrevReverbNetVals[sample] - m_PrevReverbNetBlock2Vals[sample] ) / 2;
+		// using 0.51f instead of 0.5f to compensate for round-off error increasing decay
+		m_PrevReverbNetVals[sample] = ( m_PrevReverbNetVals[sample] - m_PrevReverbNetBlock2Vals[sample] ) * 0.51f;
 	}
 
 	// reverberation network stage
@@ -112,7 +119,7 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_ReverbNetSimpleDelay.call( m_PrevReverbNetBlock2Vals );
 	m_ReverbNetBlock2APF1.call( m_PrevReverbNetBlock2Vals );
 	m_ReverbNetBlock2APF2.call( m_PrevReverbNetBlock2Vals );
-	m_ReverbNetBlock2APF3.call( m_PrevReverbNetBlock2Vals );
+	m_ReverbNetBlock2APF3.call( m_PrevReverbNetBlock2Vals, GLINT_REVERBNET_MOD_DEPTH,  m_ModVals ); // modulated allpass filtering
 
 	// offset samples to fit into dac range
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )

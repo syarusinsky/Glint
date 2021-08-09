@@ -196,6 +196,7 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF2;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF3;
 		SimpleDelay<int16_t> 		m_ReverbNetSimpleDelay;
+		float 				m_ModVals[ABUFFER_SIZE]; // for delay length modulation of reverb network block 2 APF 3
 
 		int16_t 			m_PrevReverbNetVals[ABUFFER_SIZE]; // for feedback into low-pass
 		int16_t 			m_PrevReverbNetBlock2Vals[ABUFFER_SIZE]; // for feedback into reverb block 1
