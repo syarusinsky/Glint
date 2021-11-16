@@ -9,6 +9,7 @@
 #include "OnePoleFilter.hpp"
 #include "SimpleDelay.hpp"
 #include "PolyBLEPOsc.hpp"
+#include "NoiseGate.hpp"
 
 #include <stdint.h>
 
@@ -170,6 +171,8 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		void onGlintParameterEvent (const GlintParameterEvent& paramEvent) override;
 
 	private:
+		NoiseGate<int16_t> 		m_NoiseGate;
+
 		STORAGE* 			m_StorageMedia; // where the static delay buffers sit
 		unsigned int 			m_StorageMediaSize;
 

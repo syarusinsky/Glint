@@ -9,6 +9,7 @@
 unsigned int GlintSimpleDelay::m_RunningDelayLineOffset = 0;
 
 GlintManager::GlintManager (STORAGE* delayBufferStorage) :
+	m_NoiseGate( 0.02f, 100.0f, 100 ),
 	m_StorageMedia( delayBufferStorage ),
 	m_StorageMediaSize( (Sram_23K256::SRAM_SIZE * 4) / sizeof(uint16_t) ), // size of 4 srams installed on Gen_FX_SYN rev 2
 	m_DecayTime( 0.0f ),
@@ -59,6 +60,21 @@ void GlintManager::setFiltFreq (float filtFreq)
 
 void GlintManager::call (uint16_t* writeBuffer)
 {
+	// first offset for noise gate
+	int16_t* writeBufferInt16 = reinterpret_cast<int16_t*>( writeBuffer );
+	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+	{
+		writeBuffer[sample] -= 2048;
+	}
+
+	m_NoiseGate.call( writeBufferInt16 );
+
+	// offset back
+	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+	{
+		writeBuffer[sample] += 2048;
+	}
+
 	m_LowpassFilter.setCoefficients( m_FiltFreq );
 
 	m_ReverbNetBlock1APF1.setFeedbackGain( m_DecayTime );
@@ -124,7 +140,7 @@ void GlintManager::call (uint16_t* writeBuffer)
 	// offset samples to fit into dac range
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		sampleVals[sample] *= (1.0f / scaleFactor); // TODO ensure this is evaluated as a constant
+		sampleVals[sample] *= (1.0f / scaleFactor);
 		sampleVals[sample] += 2048;
 	}
 }
