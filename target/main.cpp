@@ -86,6 +86,8 @@ class Oled_Manager : public IGlintLCDRefreshEventListener
 
 			m_Oled.begin();
 
+			m_Oled.setRefreshRatePrescaler( REFRESH_RATE_PRESCALE::BY_10 );
+
 			this->bindToGlintLCDRefreshEventSystem();
 		}
 		~Oled_Manager() override
@@ -280,27 +282,28 @@ int main(void)
 
 	while ( true )
 	{
-		if ( ! LLPD::gpio_input_get(EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN) )
-		{
-			IButtonEventListener::PublishEvent(
-					ButtonEvent(BUTTON_STATE::PRESSED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_1)) );
-		}
-		else
-		{
-			IButtonEventListener::PublishEvent(
-					ButtonEvent(BUTTON_STATE::RELEASED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_1)) );
-		}
+		// No button interactions
+		// if ( ! LLPD::gpio_input_get(EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN) )
+		// {
+		// 	IButtonEventListener::PublishEvent(
+		// 			ButtonEvent(BUTTON_STATE::PRESSED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_1)) );
+		// }
+		// else
+		// {
+		// 	IButtonEventListener::PublishEvent(
+		// 			ButtonEvent(BUTTON_STATE::RELEASED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_1)) );
+		// }
 
-		if ( ! LLPD::gpio_input_get(EFFECT2_BUTTON_PORT, EFFECT2_BUTTON_PIN) )
-		{
-			IButtonEventListener::PublishEvent(
-					ButtonEvent(BUTTON_STATE::PRESSED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_2)) );
-		}
-		else
-		{
-			IButtonEventListener::PublishEvent(
-					ButtonEvent(BUTTON_STATE::RELEASED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_2)) );
-		}
+		// if ( ! LLPD::gpio_input_get(EFFECT2_BUTTON_PORT, EFFECT2_BUTTON_PIN) )
+		// {
+		// 	IButtonEventListener::PublishEvent(
+		// 			ButtonEvent(BUTTON_STATE::PRESSED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_2)) );
+		// }
+		// else
+		// {
+		// 	IButtonEventListener::PublishEvent(
+		// 			ButtonEvent(BUTTON_STATE::RELEASED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_2)) );
+		// }
 
 		uint16_t pot1Val = LLPD::adc_get_channel_value( EFFECT1_ADC_CHANNEL );
 		float pot1Percentage = static_cast<float>( pot1Val ) * ( 1.0f / 4095.0f );

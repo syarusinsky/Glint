@@ -117,8 +117,7 @@ void GlintManager::call (uint16_t* writeBuffer)
 	// feedback from reverb network block 2
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		// using 0.51f instead of 0.5f to compensate for round-off error increasing decay
-		m_PrevReverbNetVals[sample] = ( m_PrevReverbNetVals[sample] - m_PrevReverbNetBlock2Vals[sample] ) * 0.51f;
+		m_PrevReverbNetVals[sample] = ( m_PrevReverbNetVals[sample] - m_PrevReverbNetBlock2Vals[sample] ) * 0.5f;
 	}
 
 	// reverberation network stage

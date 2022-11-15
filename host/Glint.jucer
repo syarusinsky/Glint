@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="DcIhSg" name="Glint" projectType="guiapp" jucerVersion="5.4.7"
-              cppLanguageStandard="11">
+<JUCERPROJECT id="DcIhSg" name="Glint" projectType="guiapp" jucerFormatVersion="1">
   <MAINGROUP id="Nwhz3w" name="Glint">
     <GROUP id="{98D80E54-6CF9-BEAB-7DA1-8D820991FECF}" name="Source">
+      <FILE id="kgeCNj" name="NoiseGate.hpp" compile="0" resource="0" file="../lib/SAL/include/NoiseGate.hpp"/>
+      <FILE id="PVNSxo" name="NoiseGate.cpp" compile="1" resource="0" file="../lib/SAL/src/NoiseGate.cpp"/>
       <FILE id="qbrrWM" name="AudioBuffer.cpp" compile="1" resource="0" file="../lib/SAL/src/AudioBuffer.cpp"/>
       <FILE id="qbrrWM" name="PresetManager.cpp" compile="1" resource="0"
             file="../lib/SAL/src/PresetManager.cpp"/>
