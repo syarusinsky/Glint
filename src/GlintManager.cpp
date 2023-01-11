@@ -64,6 +64,7 @@ void GlintManager::call (uint16_t* writeBuffer)
 	int16_t* writeBufferInt16 = reinterpret_cast<int16_t*>( writeBuffer );
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
+		writeBuffer[sample] += 2048 - 1011; // because I designed TTL_Mic like a moron, the zero crossing doesn't sit at 2048 :(
 		writeBuffer[sample] -= 2048;
 	}
 
