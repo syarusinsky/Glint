@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="DcIhSg" name="Glint" projectType="guiapp" jucerFormatVersion="1">
+<JUCERPROJECT id="DcIhSg" name="Glint" projectType="guiapp" jucerFormatVersion="1"
+              cppLanguageStandard="17">
   <MAINGROUP id="Nwhz3w" name="Glint">
     <GROUP id="{98D80E54-6CF9-BEAB-7DA1-8D820991FECF}" name="Source">
+      <FILE id="x2Cbfy" name="Limiter.cpp" compile="1" resource="0" file="../lib/SAL/src/Limiter.cpp"/>
+      <FILE id="pISzBz" name="Limiter.hpp" compile="0" resource="0" file="../lib/SAL/include/Limiter.hpp"/>
+      <FILE id="EI4pTL" name="IAllocator.cpp" compile="1" resource="0" file="../lib/DevLib/src/IAllocator.cpp"/>
+      <FILE id="xss9Hb" name="IAllocator.hpp" compile="0" resource="0" file="../lib/DevLib/include/IAllocator.hpp"/>
       <FILE id="kgeCNj" name="NoiseGate.hpp" compile="0" resource="0" file="../lib/SAL/include/NoiseGate.hpp"/>
       <FILE id="PVNSxo" name="NoiseGate.cpp" compile="1" resource="0" file="../lib/SAL/src/NoiseGate.cpp"/>
       <FILE id="qbrrWM" name="AudioBuffer.cpp" compile="1" resource="0" file="../lib/SAL/src/AudioBuffer.cpp"/>

@@ -34,14 +34,13 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 		{
 			this->setDelayLength( delayLength );
 
-			SharedData<uint8_t> data = SharedData<uint8_t>::MakeSharedData( m_DelayLength * sizeof(int16_t) );
-			int16_t* dataPtr = reinterpret_cast<int16_t*>( data.getPtr() );
 			for ( unsigned int sample = 0; sample < m_DelayLength; sample++ )
 			{
-				dataPtr[sample] = 0;
+				SharedData<uint8_t> data = SharedData<uint8_t>::MakeSharedData( 1 * sizeof(int16_t) );
+				int16_t* dataPtr = reinterpret_cast<int16_t*>( data.getPtr() );
+				dataPtr[0] = 0;
+				m_DelayBuffer->writeToMedia( data, m_DelayLineOffset + sample );
 			}
-
-			m_DelayBuffer->writeToMedia( data, m_DelayLineOffset );
 
 			m_RunningDelayLineOffset += m_DelayLength;
 		}
@@ -203,7 +202,6 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 
 		int16_t 			m_PrevReverbNetVals[ABUFFER_SIZE]; // for feedback into low-pass
 		int16_t 			m_PrevReverbNetBlock2Vals[ABUFFER_SIZE]; // for feedback into reverb block 1
-
 };
 
 #endif // GLINTMANAGER_HPP

@@ -148,7 +148,7 @@ void disableUnusedPins()
 int main(void)
 {
 	// set system clock to PLL with HSE (16MHz / 2) as input, so 72MHz system clock speed
-	LLPD::rcc_clock_setup( RCC_CLOCK_SOURCE::EXTERNAL, true, RCC_PLL_MULTIPLY::BY_8, SYS_CLOCK_FREQUENCY );
+	LLPD::rcc_clock_setup( RCC_CLOCK_SOURCE::EXTERNAL, true, RCC_PLL_MULTIPLY::BY_9, SYS_CLOCK_FREQUENCY );
 
 	// prescale APB1 by 2, since the maximum clock speed is 36MHz
 	LLPD::rcc_set_periph_clock_prescalers( RCC_AHB_PRES::BY_1, RCC_APB1_PRES::AHB_BY_2, RCC_APB2_PRES::AHB_BY_1 );
@@ -209,28 +209,6 @@ int main(void)
 	// pushbutton setup
 	LLPD::gpio_digital_input_setup( EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN, GPIO_PUPD::PULL_UP );
 	LLPD::gpio_digital_input_setup( EFFECT2_BUTTON_PORT, EFFECT2_BUTTON_PIN, GPIO_PUPD::PULL_UP );
-
-	// EEPROM setup and test
-	std::vector<Eeprom_CAT24C64_AddressConfig> eepromAddressConfigs;
-	eepromAddressConfigs.emplace_back( EEPROM1_ADDRESS );
-	eepromAddressConfigs.emplace_back( EEPROM2_ADDRESS );
-	Eeprom_CAT24C64_Manager eeproms( I2C_NUM::I2C_2, eepromAddressConfigs );
-	// TODO comment the verification lines out if you're using the eeprom for persistent memory
-	SharedData<uint8_t> eepromValsToWrite = SharedData<uint8_t>::MakeSharedData( 3 );
-	eepromValsToWrite[0] = 64; eepromValsToWrite[1] = 23; eepromValsToWrite[2] = 17;
-	eeproms.writeToMedia( eepromValsToWrite, 45 );
-	eeproms.writeToMedia( eepromValsToWrite, 45 + Eeprom_CAT24C64::EEPROM_SIZE );
-	SharedData<uint8_t> eeprom1Verification = eeproms.readFromMedia( 3, 45 );
-	SharedData<uint8_t> eeprom2Verification = eeproms.readFromMedia( 3, 45 + Eeprom_CAT24C64::EEPROM_SIZE );
-	if ( eeprom1Verification[0] == 64 && eeprom1Verification[1] == 23 && eeprom1Verification[2] == 17 &&
-			eeprom2Verification[0] == 64 && eeprom2Verification[1] == 23 && eeprom2Verification[2] == 17 )
-	{
-		LLPD::usart_log( USART_NUM::USART_3, "eeproms verified..." );
-	}
-	else
-	{
-		LLPD::usart_log( USART_NUM::USART_3, "WARNING!!! eeproms failed verification..." );
-	}
 
 	// SRAM setup and test
 	std::vector<Sram_23K256_GPIO_Config> spiGpioConfigs;
