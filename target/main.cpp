@@ -373,17 +373,6 @@ extern "C" void TIM6_DAC_IRQHandler (void)
 	{
 		if ( glintReady )
 		{
-			// static uint16_t flip = 4095;
-			// LLPD::dac_send( flip );
-			// if ( flip == 4095 )
-			// {
-			// 	flip = 0;
-			// }
-			// else
-			// {
-			// 	flip = 4095;
-			// }
-
 			uint16_t adcVal = LLPD::adc_get_channel_value( AUDIO_IN_CHANNEL );
 			uint16_t outVal = audioBufferPtr->getNextSample( adcVal );
 

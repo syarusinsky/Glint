@@ -60,21 +60,15 @@ void GlintManager::setFiltFreq (float filtFreq)
 
 void GlintManager::call (uint16_t* writeBuffer)
 {
-	// first offset for noise gate
 	int16_t* writeBufferInt16 = reinterpret_cast<int16_t*>( writeBuffer );
+
+	// first offset for noise gate
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		writeBuffer[sample] += 2048 - 1011; // because I designed TTL_Mic like a moron, the zero crossing doesn't sit at 2048 :(
-		writeBuffer[sample] -= 2048;
+		writeBufferInt16[sample] -= 2047;
 	}
 
 	m_NoiseGate.call( writeBufferInt16 );
-
-	// offset back
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-	{
-		writeBuffer[sample] += 2048;
-	}
 
 	m_LowpassFilter.setCoefficients( m_FiltFreq );
 
@@ -93,27 +87,23 @@ void GlintManager::call (uint16_t* writeBuffer)
 		m_ModVals[sample] = ( m_ModVals[sample] + 1.0f ) * 0.5f; // to get to range 0.0f to 1.0f
 	}
 
-	// offset samples to maximize headroom and feedback from reverb network
-	const unsigned int scaleFactor = 1;
-	int16_t* sampleVals = reinterpret_cast<int16_t*>( writeBuffer );
+	// attenuate samples to maximize headroom and feedback from reverb network
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		sampleVals[sample] -= 2048;
-		sampleVals[sample] *= scaleFactor;
-		sampleVals[sample] += m_PrevReverbNetVals[sample];
+		writeBufferInt16[sample] = writeBufferInt16[sample] + m_PrevReverbNetVals[sample];
 	}
 
-	// lowpass stage
-	m_LowpassFilter.call( sampleVals );
+	// // lowpass stage
+	m_LowpassFilter.call( writeBufferInt16 );
 
 	// diffusion stage
-	m_DiffusionAPF1.call( sampleVals );
-	m_DiffusionAPF2.call( sampleVals );
-	m_DiffusionAPF3.call( sampleVals );
-	m_DiffusionAPF4.call( sampleVals );
+	m_DiffusionAPF1.call( writeBufferInt16 );
+	m_DiffusionAPF2.call( writeBufferInt16 );
+	m_DiffusionAPF3.call( writeBufferInt16 );
+	m_DiffusionAPF4.call( writeBufferInt16 );
 
 	// sample vals will be the actual output, but we also need to calculate the reverb net output values for feedback
-	memcpy( m_PrevReverbNetVals, sampleVals, ABUFFER_SIZE * sizeof(int16_t) );
+	memcpy( m_PrevReverbNetVals, writeBufferInt16, ABUFFER_SIZE * sizeof(int16_t) );
 
 	// feedback from reverb network block 2
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
@@ -140,8 +130,8 @@ void GlintManager::call (uint16_t* writeBuffer)
 	// offset samples to fit into dac range
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		sampleVals[sample] *= (1.0f / scaleFactor);
-		sampleVals[sample] += 2048;
+		writeBufferInt16[sample] = ( std::abs(writeBufferInt16[sample] + 2047) - std::abs(writeBufferInt16[sample] - 2047) ) / 2;
+		writeBufferInt16[sample] += 2047;
 	}
 }
 
