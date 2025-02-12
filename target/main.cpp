@@ -147,10 +147,6 @@ void disableUnusedPins()
 
 int main(void)
 {
-	// dma may still be running from the last reset
-	LLPD::adc_dma_stop();
-	LLPD::dac_dma_stop();
-
 	// set system clock to PLL with HSE (16MHz / 2) as input, so 72MHz system clock speed
 	LLPD::rcc_clock_setup( RCC_CLOCK_SOURCE::EXTERNAL, true, RCC_PLL_MULTIPLY::BY_9, SYS_CLOCK_FREQUENCY );
 
@@ -277,21 +273,6 @@ int main(void)
 	LLPD::tim6_counter_disable_interrupts();
 	LLPD::dac_dma_start();
 	LLPD::adc_dma_start();
-
-	// TODO interestingly, compiling this and loading on my desktop after having loaded an image that uses dma, causes the
-	// newly loaded image to WWDG_Interrupt...
-	// I need to check if this is also the case with images built with my laptop's toolchain. If it is the case, do I need
-	// to reset the dma registers first or something? Something's funky
-	//
-	// now I've found out that I'm getting a hard fault, possibly with MSTKERR (though I need to verify this)
-	// when I comment out glintManager initialization and registering it with the audio buffer, no hard fault
-	// is this maybe just a stack overflow? Need to check by removing things from glint manager
-	//
-	// Okay, I finally have the answer, the issue is that dma (for both dac and adc) needs to be stopped before programming.
-	// The programmer must use some of that memory, so dma must corrupt it during programming. The current work around for
-	// this is to step until you get past adc_dma_stop() and dac_dma_stop(), then load the program since dma won't be
-	// corrupting anymore. This really needs to be fixed on Aki-delay and the template project as well though, so a more
-	// robust solution will be needed. Possibly a custom Reset_Handler?
 
 	while ( true )
 	{
