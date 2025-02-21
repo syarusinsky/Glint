@@ -29,6 +29,7 @@ GlintManager::GlintManager (STORAGE* delayBufferStorage) :
 	m_ReverbNetBlock2APF2( GLINT_REVERBNET2_APF_LEN_2, m_DecayTime, 0 ),
 	m_ReverbNetBlock2APF3( GLINT_REVERBNET2_APF_LEN_3 + GLINT_REVERBNET_MOD_DEPTH, m_DecayTime, 0 ),
 	m_ReverbNetSimpleDelay( GLINT_REVERBNET_SD_LEN, GLINT_REVERBNET_SD_LEN, 0 ),
+	m_ReverbNetStorageMediaDelay( delayBufferStorage, GLINT_REVERBNET_SMD_LEN, GLINT_REVERBNET_SMD_LEN, 0, reinterpret_cast<uint8_t*>(m_ModVals) ),
 	m_ModVals{ 0.0f },
 	m_PrevReverbNetVals{ 0 },
 	m_PrevReverbNetBlock2Vals{ 0 }
@@ -69,6 +70,9 @@ void GlintManager::call (uint16_t* writeBuffer)
 	}
 
 	m_NoiseGate.call( writeBufferInt16 );
+
+	// TODO right now this is still too slow, need to optimize with dma for spi as well
+	m_ReverbNetStorageMediaDelay.call( writeBufferInt16 );
 
 	m_LowpassFilter.setCoefficients( m_FiltFreq );
 

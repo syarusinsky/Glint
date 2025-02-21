@@ -25,12 +25,14 @@
 class GlintSimpleDelay : public IBufferCallback<int16_t>
 {
 	public:
-		GlintSimpleDelay (STORAGE* delayBufferStorage, unsigned int maxDelayLength, unsigned int delayLength, int16_t initVal) :
+		GlintSimpleDelay (STORAGE* delayBufferStorage, unsigned int maxDelayLength, unsigned int delayLength, int16_t initVal, uint8_t* sharedData) :
 			m_DelayLength( maxDelayLength + 1 ), // plus one because one sample is no delay
 			m_DelayBuffer( delayBufferStorage ),
 			m_DelayWriteIncr( 0 ),
 			m_DelayReadIncr( 0 ),
-			m_DelayLineOffset( m_RunningDelayLineOffset )
+			m_DelayLineOffset( m_RunningDelayLineOffset ),
+			m_SharedData( SharedData<uint8_t>::MakeSharedData(ABUFFER_SIZE * sizeof(int16_t), sharedData) ),
+			m_Feedback( 0.8f )
 		{
 			this->setDelayLength( delayLength );
 
@@ -38,7 +40,7 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			{
 				SharedData<uint8_t> data = SharedData<uint8_t>::MakeSharedData( 1 * sizeof(int16_t) );
 				int16_t* dataPtr = reinterpret_cast<int16_t*>( data.getPtr() );
-				dataPtr[0] = 0;
+				dataPtr[0] = initVal;
 				m_DelayBuffer->writeToMedia( data, m_DelayLineOffset + sample );
 			}
 
@@ -55,6 +57,7 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			int16_t delayedVal = ( readByte1 << 8 ) | ( readByte2 );
 
 			// write current sample value
+			sampleVal = ( sampleVal + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
 			unsigned int writeOffset = ( m_DelayLineOffset + m_DelayWriteIncr ) * sizeof(int16_t);
 			uint8_t writeByte1 = ( sampleVal >> 8 );
 			uint8_t writeByte2 = ( sampleVal & 0b11111111 );
@@ -72,49 +75,45 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			m_DelayReadIncr = ( m_DelayWriteIncr + (m_DelayLength - delayLength) ) % m_DelayLength;
 		}
 
+		void setFeedback (float feedback)
+		{
+			m_Feedback = feedback;
+		}
+
 		void call (int16_t* writeBuffer) override
 		{
-			SharedData<uint8_t> readData = SharedData<uint8_t>::MakeSharedData( ABUFFER_SIZE * sizeof(int16_t) );
-			unsigned int endIndex = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
-			unsigned int startIndex = m_DelayReadIncr;
-			if ( endIndex < startIndex )
+			const unsigned int endIndex = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
+			const unsigned int startIndex = m_DelayReadIncr;
+
+			if ( endIndex < startIndex && endIndex != 0 )
 			{
 				// we need to wrap around the delay buffer
-				unsigned int firstHalfSize = m_DelayLength - startIndex;
-				unsigned int secondHalfSize = endIndex;
-				SharedData<uint8_t> firstHalf =
-					m_DelayBuffer->readFromMedia( firstHalfSize * sizeof(int16_t),
-									(m_DelayLineOffset + startIndex) * sizeof(int16_t) );
-				SharedData<uint8_t> secondHalf =
-					m_DelayBuffer->readFromMedia( secondHalfSize * sizeof(int16_t),
-									(m_DelayLineOffset) * sizeof(int16_t) );
+				const unsigned int firstHalfSize = m_DelayLength - startIndex;
+				const unsigned int secondHalfSize = endIndex;
 
-				// fill readData buffer with read values
-				for ( unsigned int byte = 0; byte < firstHalfSize * sizeof(int16_t); byte++ )
-				{
-					readData[byte] = firstHalf[byte];
-				}
-				unsigned int secondHalfOffset = firstHalfSize * sizeof(int16_t);
-				for ( unsigned int byte = secondHalfOffset; byte < ABUFFER_SIZE * sizeof(int16_t); byte++ )
-				{
-					readData[byte] = secondHalf[byte - secondHalfOffset];
-				}
+				const SharedData<uint8_t> firstHalf
+					= SharedData<uint8_t>::MakeSharedData( firstHalfSize * sizeof(int16_t), m_SharedData.getPtr() );
+				const SharedData<uint8_t> secondHalf
+					= SharedData<uint8_t>::MakeSharedData( secondHalfSize * sizeof(int16_t), m_SharedData.getPtr() + (firstHalfSize * sizeof(int16_t)) );
+
+				// read both halves from media
+				m_DelayBuffer->readFromMedia( (m_DelayLineOffset + startIndex) * sizeof(int16_t), firstHalf );
+				m_DelayBuffer->readFromMedia( (m_DelayLineOffset) * sizeof(int16_t), secondHalf );
 			}
 			else // endIndex > startIndex
 			{
 				// we can just read ABUFFER_SIZE contiguous samples
-				readData = m_DelayBuffer->readFromMedia( ABUFFER_SIZE * sizeof(int16_t),
-									(m_DelayLineOffset + startIndex) * sizeof(int16_t) );
+				m_DelayBuffer->readFromMedia( (m_DelayLineOffset + startIndex) * sizeof(int16_t), m_SharedData );
 			}
 
 			// write read data into writeBuffer
-			int16_t* readDataPtr = reinterpret_cast<int16_t*>( readData.getPtr() );
+			int16_t* readDataPtr = reinterpret_cast<int16_t*>( m_SharedData.getPtr() );
 			for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 			{
 				int16_t delayedVal = readDataPtr[sample];
 
 				// use the same buffer (readData) to write to
-				readDataPtr[sample] = writeBuffer[sample];
+				readDataPtr[sample] = ( writeBuffer[sample] + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
 
 				// write the delayed value to the actual write buffer
 				writeBuffer[sample] = delayedVal;
@@ -122,37 +121,39 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 
 			unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
 			unsigned int startWriteIndex = m_DelayWriteIncr;
-			if ( endWriteIndex < startWriteIndex )
+
+			if ( endWriteIndex < startWriteIndex && endWriteIndex != 0 )
 			{
 				// we need to wrap around the delay buffer
 				unsigned int firstHalfSize = m_DelayLength - startWriteIndex;
-				SharedData<uint8_t> firstHalf =
-					SharedData<uint8_t>::MakeSharedDataFromRange( readData, 0, (firstHalfSize * sizeof(int16_t)) - 1 );
-				SharedData<uint8_t> secondHalf =
-					SharedData<uint8_t>::MakeSharedDataFromRange( readData, firstHalfSize * sizeof(int16_t),
-											(ABUFFER_SIZE * sizeof(int16_t)) - 1 );
+				unsigned int secondHalfSize = ABUFFER_SIZE - firstHalfSize;
+				const SharedData<uint8_t> firstHalf
+					= SharedData<uint8_t>::MakeSharedData( firstHalfSize * sizeof(int16_t), m_SharedData.getPtr() );
+				const SharedData<uint8_t> secondHalf
+					= SharedData<uint8_t>::MakeSharedData( secondHalfSize * sizeof(int16_t), m_SharedData.getPtr() + (firstHalfSize * sizeof(int16_t)) );
 
-				// write both halves to buffer
+				// write both halves to media
 				m_DelayBuffer->writeToMedia( firstHalf, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
 				m_DelayBuffer->writeToMedia( secondHalf, (m_DelayLineOffset) * sizeof(int16_t) );
 			}
 			else // endWriteIndex > startWriteIndex
 			{
 				// we can just write contiguous samples
-				m_DelayBuffer->writeToMedia( readData, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
+				m_DelayBuffer->writeToMedia( m_SharedData, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
 			}
 
 			m_DelayWriteIncr = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
 			m_DelayReadIncr = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
 		}
-
-	private:
+private:
 		unsigned int 	m_DelayLength;
 		STORAGE* 	m_DelayBuffer;
 		unsigned int 	m_DelayWriteIncr;
 		unsigned int 	m_DelayReadIncr;
 		unsigned int 	m_DelayLineOffset; // since we're using one contiguous storage device, offset each delay
 		static unsigned int m_RunningDelayLineOffset; // use this value to determine where to put new delay lines in memory
+		const SharedData<uint8_t> m_SharedData; // we'll have to use another block of memory since we're so limited
+		float 		m_Feedback;
 };
 
 class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEventListener
@@ -198,6 +199,7 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF2;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF3;
 		SimpleDelay<int16_t> 		m_ReverbNetSimpleDelay;
+		GlintSimpleDelay 		m_ReverbNetStorageMediaDelay;
 		float 				m_ModVals[ABUFFER_SIZE]; // for delay length modulation of reverb network block 2 APF 3
 
 		int16_t 			m_PrevReverbNetVals[ABUFFER_SIZE]; // for feedback into low-pass
