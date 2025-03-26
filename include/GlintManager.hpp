@@ -25,6 +25,15 @@
 class GlintSimpleDelay : public IBufferCallback<int16_t>
 {
 	public:
+		enum class DmaStage
+		{
+			WRITING_FIRST_HALF,
+			WRITING_FINISHING,
+			READING_FIRST_HALF,
+			READING_FINISHING,
+			SEQUENCE_COMPLETE
+		};
+
 		GlintSimpleDelay (STORAGE* delayBufferStorage, unsigned int maxDelayLength, unsigned int delayLength, int16_t initVal, uint8_t* sharedData) :
 			m_DelayLength( maxDelayLength + 1 ), // plus one because one sample is no delay
 			m_DelayBuffer( delayBufferStorage ),
@@ -32,16 +41,21 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			m_DelayReadIncr( 0 ),
 			m_DelayLineOffset( m_RunningDelayLineOffset ),
 			m_SharedData( SharedData<uint8_t>::MakeSharedData(ABUFFER_SIZE * sizeof(int16_t), sharedData) ),
-			m_Feedback( 0.8f )
+			m_Feedback( 0.8f ),
+			m_DmaStage( DmaStage::SEQUENCE_COMPLETE )
 		{
+#ifdef TARGET_BUILD
+			delayBufferStorage->setDmaTransferCompleteCallback( std::bind(&GlintSimpleDelay::dmaTransferCompleteCallback, this) );
+#endif
 			this->setDelayLength( delayLength );
 
 			for ( unsigned int sample = 0; sample < m_DelayLength; sample++ )
 			{
-				SharedData<uint8_t> data = SharedData<uint8_t>::MakeSharedData( 1 * sizeof(int16_t) );
-				int16_t* dataPtr = reinterpret_cast<int16_t*>( data.getPtr() );
-				dataPtr[0] = initVal;
-				m_DelayBuffer->writeToMedia( data, m_DelayLineOffset + sample );
+				unsigned int writeOffset = ( m_DelayLineOffset + sample ) * sizeof(int16_t);
+				uint8_t writeByte1 = ( initVal >> 8 );
+				uint8_t writeByte2 = ( initVal & 0b11111111 );
+				m_DelayBuffer->writeByte( writeOffset, writeByte1 );
+				m_DelayBuffer->writeByte( writeOffset + 1, writeByte2 );
 			}
 
 			m_RunningDelayLineOffset += m_DelayLength;
@@ -80,8 +94,109 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			m_Feedback = feedback;
 		}
 
+		void dmaTransferCompleteCallback() // handles the stages of writing to and reading from the sram through dma
+		{
+			if ( m_DmaStage == DmaStage::WRITING_FIRST_HALF )
+			{
+				const unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
+				const unsigned int startWriteIndex = m_DelayWriteIncr;
+				const unsigned int firstHalfSize = m_DelayLength - startWriteIndex;
+				const unsigned int secondHalfSize = ABUFFER_SIZE - firstHalfSize;
+
+				const SharedData<uint8_t> secondHalf
+					= SharedData<uint8_t>::MakeSharedData( secondHalfSize * sizeof(int16_t), m_SharedData.getPtr() + (firstHalfSize * sizeof(int16_t)) );
+
+				m_DmaStage = DmaStage::WRITING_FINISHING;
+				m_DelayBuffer->writeToMedia( secondHalf, (m_DelayLineOffset) * sizeof(int16_t) );
+			}
+			else if ( m_DmaStage == DmaStage::WRITING_FINISHING )
+			{
+				m_DelayWriteIncr = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
+				m_DelayReadIncr = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
+
+				const unsigned int endIndex = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
+				const unsigned int startIndex = m_DelayReadIncr;
+
+				if ( endIndex < startIndex && endIndex != 0 )
+				{
+					// we need to wrap around the delay buffer
+					const unsigned int firstHalfSize = m_DelayLength - startIndex;
+
+					const SharedData<uint8_t> firstHalf
+						= SharedData<uint8_t>::MakeSharedData( firstHalfSize * sizeof(int16_t), m_SharedData.getPtr() );
+
+					m_DmaStage = DmaStage::READING_FIRST_HALF;
+					m_DelayBuffer->readFromMedia( (m_DelayLineOffset + startIndex) * sizeof(int16_t), firstHalf );
+				}
+				else // endIndex > startIndex
+				{
+					m_DmaStage = DmaStage::READING_FINISHING;
+
+					// we can just read ABUFFER_SIZE contiguous samples
+					m_DelayBuffer->readFromMedia( (m_DelayLineOffset + startIndex) * sizeof(int16_t), m_SharedData );
+				}
+			}
+			else if ( m_DmaStage == DmaStage::READING_FIRST_HALF )
+			{
+				const unsigned int endIndex = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
+				const unsigned int startIndex = m_DelayReadIncr;
+
+				const unsigned int firstHalfSize = m_DelayLength - startIndex;
+				const unsigned int secondHalfSize = endIndex;
+
+				const SharedData<uint8_t> secondHalf
+					= SharedData<uint8_t>::MakeSharedData( secondHalfSize * sizeof(int16_t), m_SharedData.getPtr() + (firstHalfSize * sizeof(int16_t)) );
+
+				m_DmaStage = DmaStage::READING_FINISHING;
+				m_DelayBuffer->readFromMedia( (m_DelayLineOffset) * sizeof(int16_t), secondHalf );
+			}
+			else if ( m_DmaStage == DmaStage::READING_FINISHING )
+			{
+				m_DmaStage = DmaStage::SEQUENCE_COMPLETE;
+			}
+		}
+
 		void call (int16_t* writeBuffer) override
 		{
+#ifdef TARGET_BUILD // using dma
+			// wait for transfer complete
+			while ( m_DmaStage != DmaStage::SEQUENCE_COMPLETE ) {}
+
+			// write read data into writeBuffer
+			int16_t* readDataPtr = reinterpret_cast<int16_t*>( m_SharedData.getPtr() );
+			for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+			{
+				int16_t delayedVal = readDataPtr[sample];
+
+				// use the same buffer (readData) to write to
+				readDataPtr[sample] = ( writeBuffer[sample] + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
+
+				// write the delayed value to the actual write buffer
+				writeBuffer[sample] = delayedVal;
+			}
+
+			const unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
+			const unsigned int startWriteIndex = m_DelayWriteIncr;
+
+			if ( endWriteIndex < startWriteIndex && endWriteIndex != 0 )
+			{
+				// we need to wrap around the delay buffer
+				unsigned int firstHalfSize = m_DelayLength - startWriteIndex;
+				const SharedData<uint8_t> firstHalf
+					= SharedData<uint8_t>::MakeSharedData( firstHalfSize * sizeof(int16_t), m_SharedData.getPtr() );
+
+				// write first half to media
+				m_DmaStage = DmaStage::WRITING_FIRST_HALF;
+				m_DelayBuffer->writeToMedia( firstHalf, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
+			}
+			else // endWriteIndex > startWriteIndex
+			{
+				// we can just write contiguous samples
+				m_DmaStage = DmaStage::WRITING_FINISHING;
+				m_DelayBuffer->writeToMedia( m_SharedData, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
+			}
+
+#else // no dma on host build
 			const unsigned int endIndex = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
 			const unsigned int startIndex = m_DelayReadIncr;
 
@@ -119,8 +234,8 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 				writeBuffer[sample] = delayedVal;
 			}
 
-			unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
-			unsigned int startWriteIndex = m_DelayWriteIncr;
+			const unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
+			const unsigned int startWriteIndex = m_DelayWriteIncr;
 
 			if ( endWriteIndex < startWriteIndex && endWriteIndex != 0 )
 			{
@@ -144,16 +259,18 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 
 			m_DelayWriteIncr = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
 			m_DelayReadIncr = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
+#endif
 		}
 private:
-		unsigned int 	m_DelayLength;
-		STORAGE* 	m_DelayBuffer;
-		unsigned int 	m_DelayWriteIncr;
-		unsigned int 	m_DelayReadIncr;
-		unsigned int 	m_DelayLineOffset; // since we're using one contiguous storage device, offset each delay
-		static unsigned int m_RunningDelayLineOffset; // use this value to determine where to put new delay lines in memory
-		const SharedData<uint8_t> m_SharedData; // we'll have to use another block of memory since we're so limited
-		float 		m_Feedback;
+		unsigned int 			m_DelayLength;
+		STORAGE* 			m_DelayBuffer;
+		unsigned int 			m_DelayWriteIncr;
+		unsigned int 			m_DelayReadIncr;
+		unsigned int 			m_DelayLineOffset; // since we're using one contiguous storage device, offset each delay
+		static unsigned int 		m_RunningDelayLineOffset; // use this value to determine where to put new delay lines in memory
+		const SharedData<uint8_t> 	m_SharedData; // we'll have to use another block of memory since we're so limited
+		float 				m_Feedback;
+		volatile DmaStage 		m_DmaStage;
 };
 
 class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEventListener

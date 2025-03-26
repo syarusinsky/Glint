@@ -160,28 +160,28 @@ int main(void)
 	LLPD::gpio_enable_clock( GPIO_PORT::F );
 
 	// USART setup
-	LLPD::usart_init( USART_NUM::USART_3, USART_WORD_LENGTH::BITS_8, USART_PARITY::EVEN, USART_CONF::TX_AND_RX,
-				USART_STOP_BITS::BITS_1, SYS_CLOCK_FREQUENCY, 9600 );
-	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN starting up -----------------------------" );
+	// LLPD::usart_init( USART_NUM::USART_3, USART_WORD_LENGTH::BITS_8, USART_PARITY::EVEN, USART_CONF::TX_AND_RX,
+	// 			USART_STOP_BITS::BITS_1, SYS_CLOCK_FREQUENCY, 9600 );
+	// LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN starting up -----------------------------" );
 
 	// disable the unused pins
 	disableUnusedPins();
 
 	// i2c setup (72MHz source 1000KHz clock 0x00A00D26)
 	LLPD::i2c_master_setup( I2C_NUM::I2C_2, 0x00A00D26 );
-	LLPD::usart_log( USART_NUM::USART_3, "I2C initialized..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "I2C initialized..." );
 
 	// spi init (36MHz SPI2 source 18MHz clock)
 	LLPD::spi_master_init( SPI_NUM::SPI_2, SPI_BAUD_RATE::APB1CLK_DIV_BY_2, SPI_CLK_POL::LOW_IDLE, SPI_CLK_PHASE::FIRST,
-				SPI_DUPLEX::FULL, SPI_FRAME_FORMAT::MSB_FIRST, SPI_DATA_SIZE::BITS_8 );
-	LLPD::usart_log( USART_NUM::USART_3, "spi initialized..." );
+				SPI_DUPLEX::FULL, SPI_FRAME_FORMAT::MSB_FIRST, SPI_DATA_SIZE::BITS_8, true );
+	// LLPD::usart_log( USART_NUM::USART_3, "spi initialized..." );
 
 	// audio timer setup (for 40 kHz sampling rate at 72 MHz system clock)
 	LLPD::tim6_counter_setup( 0, 1800, 40000 );
 	LLPD::tim3_counter_setup( 0, 1800, 40000 );
 	LLPD::tim6_counter_enable_interrupts();
-	LLPD::usart_log( USART_NUM::USART_3, "tim6 initialized..." );
-	LLPD::usart_log( USART_NUM::USART_3, "tim3 initialized..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "tim6 initialized..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "tim3 initialized..." );
 
 	// set up audio buffer for use with adc and dac dma
 	AudioBuffer<uint16_t> audioBuffer;
@@ -190,21 +190,21 @@ int main(void)
 	// DAC setup
 	// LLPD::dac_init( true ); // for interrupt based audio
 	LLPD::dac_init_use_dma( true, ABUFFER_SIZE * 2, (uint16_t*) audioBuffer.getBuffer1() );
-	LLPD::usart_log( USART_NUM::USART_3, "dac initialized..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "dac initialized..." );
 
 	// Op Amp setup
 	LLPD::gpio_analog_setup( OP_AMP_PORT, OP_AMP_INVERT_PIN );
 	LLPD::gpio_analog_setup( OP_AMP_PORT, OP_AMP_OUTPUT_PIN );
 	LLPD::gpio_analog_setup( OP_AMP_PORT, OP_AMP_NON_INVERT_PIN );
 	LLPD::opamp_init();
-	LLPD::usart_log( USART_NUM::USART_3, "op amp initialized..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "op amp initialized..." );
 
 	// audio timer start
 	LLPD::tim6_counter_start();
 	LLPD::tim3_counter_start();
 	LLPD::tim3_sync_to_tim6();
-	LLPD::usart_log( USART_NUM::USART_3, "tim6 started..." );
-	LLPD::usart_log( USART_NUM::USART_3, "tim3 started..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "tim6 started..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "tim3 started..." );
 
 	// ADC setup (note, this must be done after the tim6_counter_start() call since it uses the delay function)
 	LLPD::rcc_pll_enable( RCC_CLOCK_SOURCE::INTERNAL, false, RCC_PLL_MULTIPLY::NONE );
@@ -214,11 +214,11 @@ int main(void)
 	LLPD::gpio_analog_setup( AUDIO_IN_PORT, AUDIO_IN_PIN );
 	LLPD::adc_init( ADC_CYCLES_PER_SAMPLE::CPS_19p5 );
 	// for interrupt based audio
-	LLPD::adc_set_channel_order( false, 4, ADC_CHANNEL::CHAN_INVALID, nullptr, 0,
-					EFFECT1_ADC_CHANNEL, EFFECT2_ADC_CHANNEL, EFFECT3_ADC_CHANNEL, AUDIO_IN_CHANNEL );
+	// LLPD::adc_set_channel_order( false, 4, ADC_CHANNEL::CHAN_INVALID, nullptr, 0,
+	// 				EFFECT1_ADC_CHANNEL, EFFECT2_ADC_CHANNEL, EFFECT3_ADC_CHANNEL, AUDIO_IN_CHANNEL );
 	LLPD::adc_set_channel_order( true, 4, AUDIO_IN_CHANNEL, (uint32_t*) audioBuffer.getBuffer1(), ABUFFER_SIZE * 2,
 					EFFECT1_ADC_CHANNEL, EFFECT2_ADC_CHANNEL, EFFECT3_ADC_CHANNEL, AUDIO_IN_CHANNEL );
-	LLPD::usart_log( USART_NUM::USART_3, "adc initialized..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "adc initialized..." );
 
 	// pushbutton setup
 	LLPD::gpio_digital_input_setup( EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN, GPIO_PUPD::PULL_UP );
@@ -231,36 +231,172 @@ int main(void)
 	spiGpioConfigs.emplace_back( SRAM3_CS_PORT, SRAM3_CS_PIN );
 	spiGpioConfigs.emplace_back( SRAM4_CS_PORT, SRAM4_CS_PIN );
 	Sram_23K256_Manager srams( SPI_NUM::SPI_2, spiGpioConfigs );
-	SharedData<uint8_t> sramValsToWrite = SharedData<uint8_t>::MakeSharedData( 3 );
-	sramValsToWrite[0] = 25; sramValsToWrite[1] = 16; sramValsToWrite[2] = 8;
-	srams.writeToMedia( sramValsToWrite, 45 );
-	srams.writeToMedia( sramValsToWrite, 45 + Sram_23K256::SRAM_SIZE );
-	srams.writeToMedia( sramValsToWrite, 45 + Sram_23K256::SRAM_SIZE * 2 );
-	srams.writeToMedia( sramValsToWrite, 45 + Sram_23K256::SRAM_SIZE * 3 );
-	SharedData<uint8_t> sram1Verification = srams.readFromMedia( 3, 45 );
-	SharedData<uint8_t> sram2Verification = srams.readFromMedia( 3, 45 + Sram_23K256::SRAM_SIZE );
-	SharedData<uint8_t> sram3Verification = srams.readFromMedia( 3, 45 + Sram_23K256::SRAM_SIZE * 2 );
-	SharedData<uint8_t> sram4Verification = srams.readFromMedia( 3, 45 + Sram_23K256::SRAM_SIZE * 3 );
-	if ( sram1Verification[0] == 25 && sram1Verification[1] == 16 && sram1Verification[2] == 8 &&
-			sram2Verification[0] == 25 && sram2Verification[1] == 16 && sram2Verification[2] == 8 &&
-			sram3Verification[0] == 25 && sram3Verification[1] == 16 && sram3Verification[2] == 8 &&
-			sram4Verification[0] == 25 && sram4Verification[1] == 16 && sram4Verification[2] == 8 )
-	{
-		LLPD::usart_log( USART_NUM::USART_3, "srams verified..." );
-	}
-	else
-	{
-		LLPD::usart_log( USART_NUM::USART_3, "WARNING!!! srams failed verification..." );
-	}
+	// SharedData<uint8_t> sramValsToWrite = SharedData<uint8_t>::MakeSharedData( 3 );
+	// sramValsToWrite[0] = 25; sramValsToWrite[1] = 16; sramValsToWrite[2] = 8;
+	// srams.writeToMedia( sramValsToWrite, 45 );
+	// srams.writeToMedia( sramValsToWrite, 45 + Sram_23K256::SRAM_SIZE );
+	// srams.writeToMedia( sramValsToWrite, 45 + Sram_23K256::SRAM_SIZE * 2 );
+	// srams.writeToMedia( sramValsToWrite, 45 + Sram_23K256::SRAM_SIZE * 3 );
+	// SharedData<uint8_t> sram1Verification = srams.readFromMedia( 3, 45 );
+	// SharedData<uint8_t> sram2Verification = srams.readFromMedia( 3, 45 + Sram_23K256::SRAM_SIZE );
+	// SharedData<uint8_t> sram3Verification = srams.readFromMedia( 3, 45 + Sram_23K256::SRAM_SIZE * 2 );
+	// SharedData<uint8_t> sram4Verification = srams.readFromMedia( 3, 45 + Sram_23K256::SRAM_SIZE * 3 );
+	// if ( sram1Verification[0] == 25 && sram1Verification[1] == 16 && sram1Verification[2] == 8 &&
+	// 		sram2Verification[0] == 25 && sram2Verification[1] == 16 && sram2Verification[2] == 8 &&
+	// 		sram3Verification[0] == 25 && sram3Verification[1] == 16 && sram3Verification[2] == 8 &&
+	// 		sram4Verification[0] == 25 && sram4Verification[1] == 16 && sram4Verification[2] == 8 )
+	// {
+	// 	// LLPD::usart_log( USART_NUM::USART_3, "srams verified..." );
+	// }
+	// else
+	// {
+	// 	// LLPD::usart_log( USART_NUM::USART_3, "WARNING!!! srams failed verification..." );
+	// }
 	srams.setSequentialMode( true );
+	srams.setDmaMode( &LLPD::spi2_dma_tx_tc_callback, &LLPD::spi2_dma_rx_tc_callback );
 
-	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
+	// TODO test code, remove when done testing
+	/*
+	uint8_t dmaWriteData[] =
+	{
+		0b00000010,
+		0b00000000,
+		0b00000111,
+		0b01111111,
+	};
+	uint8_t dmaReadData[] =
+	{
+		0b00000000,
+		0b00000000,
+		0b00000000,
+		0b00000000
+	};
+	// write initial value
+	LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, false );
+	for ( unsigned int byte = 0; byte < sizeof(dmaWriteData); byte++ )
+	{
+		LLPD::spi_master_send_and_recieve( SPI_NUM::SPI_2, dmaWriteData[byte] );
+	}
+	LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, true );
+
+	// ensure correct initial value was written
+	dmaWriteData[0] = 0b00000011;
+	dmaWriteData[1] = 0b00000000;
+	dmaWriteData[2] = 0b00000111;
+	dmaWriteData[3] = 0b00000000;
+	LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, false );
+	for ( unsigned int byte = 0; byte < sizeof(dmaWriteData); byte++ )
+	{
+		dmaReadData[byte] = LLPD::spi_master_send_and_recieve( SPI_NUM::SPI_2, dmaWriteData[byte] );
+	}
+	LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, true );
+	if ( dmaReadData[3] != 0b01111111 )
+	{
+		// LLPD::usart_log( USART_NUM::USART_3, "sram test initial value wrong..." );
+		while ( true ) {}
+	}
+
+	LLPD::gpio_output_setup( GPIO_PORT::B, GPIO_PIN::PIN_11, GPIO_PUPD::PULL_DOWN, GPIO_OUTPUT_TYPE::PUSH_PULL, GPIO_OUTPUT_SPEED::HIGH, true );
+
+	while ( dmaReadData[3] != 0b01010101 )
+	{
+		// write value
+		dmaWriteData[0] = 0b00000010;
+		dmaWriteData[1] = 0b00000000;
+		dmaWriteData[2] = 0b00000111;
+		dmaWriteData[3] = 0b01010101;
+
+		LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, false );
+		LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, false );
+		LLPD::spi2_dma_start( dmaWriteData, dmaReadData, 4 );
+		LLPD::spi2_dma_wait_for_transfer_complete();
+		LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, true );
+		LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, true );
+
+		// LLPD::spi2_dma_wait_for_transfer_complete();
+		// LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, false );
+		// LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, false );
+		// for ( unsigned int byte = 0; byte < sizeof(dmaWriteData); byte++ )
+		// {
+		// 	dmaReadData[byte] = LLPD::spi_master_send_and_recieve( SPI_NUM::SPI_2, dmaWriteData[byte] );
+		// }
+		// LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, true );
+		// LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, true );
+
+		// read value
+		dmaWriteData[0] = 0b00000011;
+		dmaWriteData[1] = 0b00000000;
+		dmaWriteData[2] = 0b00000111;
+		dmaWriteData[3] = 0b00000000;
+
+		LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, false );
+		LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, false );
+		LLPD::spi2_dma_start( dmaWriteData, dmaReadData, 4 );
+		LLPD::spi2_dma_wait_for_transfer_complete();
+		LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, true );
+		LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, true );
+
+		// LLPD::spi2_dma_wait_for_transfer_complete();
+		// LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, false );
+		// LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, false );
+		// for ( unsigned int byte = 0; byte < sizeof(dmaWriteData); byte++ )
+		// {
+		// 	dmaReadData[byte] = LLPD::spi_master_send_and_recieve( SPI_NUM::SPI_2, dmaWriteData[byte] );
+		// }
+		// LLPD::gpio_output_set( SRAM1_CS_PORT, SRAM1_CS_PIN, true );
+		// LLPD::gpio_output_set( GPIO_PORT::B, GPIO_PIN::PIN_11, true );
+	}
+
+	srams.setSequentialMode( true );
+	srams.setDmaMode( &LLPD::spi2_dma_tx_tc_callback, &LLPD::spi2_dma_rx_tc_callback );
+	volatile unsigned int dataToTransfer = 253;
+	while ( dataToTransfer != 0 )
+	{
+		bool verified = false;
+		while ( ! verified )
+		{
+			SharedData<uint8_t> testData1 = SharedData<uint8_t>::MakeSharedData( 253 );
+			for ( unsigned int i = 0; i < 253; i++ )
+			{
+				testData1[i] = i;
+			}
+
+			srams.writeToMedia( testData1, Sram_23K256::SRAM_SIZE - 100 );
+			while ( ! srams.dmaTransferComplete() ) {}
+			for ( unsigned int i = 0; i < 253; i++ )
+			{
+				testData1[i] = 0;
+			}
+			srams.readFromMedia( Sram_23K256::SRAM_SIZE - 100, testData1 );
+			while ( ! srams.dmaTransferComplete() ) {}
+
+			verified = true;
+			for ( unsigned int i = 0; i < 253; i++ )
+			{
+				if ( testData1[i] != i )
+				{
+					verified = false;
+				}
+			}
+
+			if ( verified )
+			{
+				dataToTransfer -= 253;
+			}
+		}
+	}
+	*/
+
+	// TODO remove test code, change spi2_dma stuff to generic spi dma so that it will work with my other stm32 hals,
+	// test dma srams with glint, optimize sound
+
+	// LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
 
 	GlintManager glintManager( &srams );
 	GlintUiManager glintUiManager( Smoll_data, GlintMainImage_data );
 
 	Oled_Manager oled( glintUiManager.getFrameBuffer()->getPixels() );
-	LLPD::usart_log( USART_NUM::USART_3, "oled initialized..." );
+	// LLPD::usart_log( USART_NUM::USART_3, "oled initialized..." );
 
 	// initial drawing of the UI
 	glintUiManager.draw();
@@ -366,7 +502,7 @@ extern "C" void HardFault_Handler (void)
 {
 	while (1)
 	{
-		LLPD::usart_log( USART_NUM::USART_3, "Hard Faulting -----------------------------" );
+		// LLPD::usart_log( USART_NUM::USART_3, "Hard Faulting -----------------------------" );
 	}
 }
 
@@ -374,7 +510,7 @@ extern "C" void MemManage_Handler (void)
 {
 	while (1)
 	{
-		LLPD::usart_log( USART_NUM::USART_3, "Mem Manage Faulting -----------------------------" );
+		// LLPD::usart_log( USART_NUM::USART_3, "Mem Manage Faulting -----------------------------" );
 	}
 }
 
@@ -382,7 +518,7 @@ extern "C" void BusFault_Handler (void)
 {
 	while (1)
 	{
-		LLPD::usart_log( USART_NUM::USART_3, "Bus Faulting -----------------------------" );
+		// LLPD::usart_log( USART_NUM::USART_3, "Bus Faulting -----------------------------" );
 	}
 }
 
@@ -390,6 +526,6 @@ extern "C" void UsageFault_Handler (void)
 {
 	while (1)
 	{
-		LLPD::usart_log( USART_NUM::USART_3, "Usage Faulting -----------------------------" );
+		// LLPD::usart_log( USART_NUM::USART_3, "Usage Faulting -----------------------------" );
 	}
 }

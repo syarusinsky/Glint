@@ -71,7 +71,6 @@ void GlintManager::call (uint16_t* writeBuffer)
 
 	m_NoiseGate.call( writeBufferInt16 );
 
-	// TODO right now this is still too slow, need to optimize with dma for spi as well
 	m_ReverbNetStorageMediaDelay.call( writeBufferInt16 );
 
 	m_LowpassFilter.setCoefficients( m_FiltFreq );
@@ -83,13 +82,13 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_ReverbNetBlock2APF2.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock2APF3.setFeedbackGain( m_DecayTime );
 
-	// get the sine wave values for modulation
-	m_ReverbNetModOsc.setFrequency( m_ModRate );
-	m_ReverbNetModOsc.call( m_ModVals );
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-	{
-		m_ModVals[sample] = ( m_ModVals[sample] + 1.0f ) * 0.5f; // to get to range 0.0f to 1.0f
-	}
+	// // get the sine wave values for modulation
+	// m_ReverbNetModOsc.setFrequency( m_ModRate );
+	// m_ReverbNetModOsc.call( m_ModVals );
+	// for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+	// {
+	// 	m_ModVals[sample] = ( m_ModVals[sample] + 1.0f ) * 0.5f; // to get to range 0.0f to 1.0f
+	// }
 
 	// attenuate samples to maximize headroom and feedback from reverb network
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
@@ -129,7 +128,8 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_ReverbNetSimpleDelay.call( m_PrevReverbNetBlock2Vals );
 	m_ReverbNetBlock2APF1.call( m_PrevReverbNetBlock2Vals );
 	m_ReverbNetBlock2APF2.call( m_PrevReverbNetBlock2Vals );
-	m_ReverbNetBlock2APF3.call( m_PrevReverbNetBlock2Vals, GLINT_REVERBNET_MOD_DEPTH,  m_ModVals ); // modulated allpass filtering
+	// m_ReverbNetBlock2APF3.call( m_PrevReverbNetBlock2Vals, GLINT_REVERBNET_MOD_DEPTH,  m_ModVals ); // modulated allpass filtering
+	m_ReverbNetBlock2APF3.call( m_PrevReverbNetBlock2Vals );
 
 	// offset samples to fit into dac range
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
