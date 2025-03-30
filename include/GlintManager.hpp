@@ -21,6 +21,8 @@
 	#include "FakeStorageDevice.hpp"
 #endif
 
+#define USE_ALLPASS_FOR_GLINT_SIMPLE_DELAY
+
 // this simple delay uses IStorageMedia as opposed to an array
 class GlintSimpleDelay : public IBufferCallback<int16_t>
 {
@@ -71,7 +73,14 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			int16_t delayedVal = ( readByte1 << 8 ) | ( readByte2 );
 
 			// write current sample value
+#ifdef USE_ALLPASS_FOR_GLINT_SIMPLE_DELAY
+			int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
+			delayedVal = ( (newSampleVal * m_Feedback) + delayedVal );
+			int16_t outVal = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
+#else // using normal delay
 			sampleVal = ( sampleVal + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
+			int16_t outVal = delayedVal;
+#endif
 			unsigned int writeOffset = ( m_DelayLineOffset + m_DelayWriteIncr ) * sizeof(int16_t);
 			uint8_t writeByte1 = ( sampleVal >> 8 );
 			uint8_t writeByte2 = ( sampleVal & 0b11111111 );
@@ -81,7 +90,7 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			m_DelayWriteIncr = ( m_DelayWriteIncr + 1 ) % m_DelayLength;
 			m_DelayReadIncr = ( m_DelayReadIncr + 1 ) % m_DelayLength;
 
-			return delayedVal;
+			return outVal;
 		}
 
 		void setDelayLength (unsigned int delayLength)
@@ -91,7 +100,7 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 
 		void setFeedback (float feedback)
 		{
-			m_Feedback = feedback;
+			m_Feedback = std::max<float>( feedback, 0.913f );
 		}
 
 		void dmaTransferCompleteCallback() // handles the stages of writing to and reading from the sram through dma
@@ -169,7 +178,14 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 				int16_t delayedVal = readDataPtr[sample];
 
 				// use the same buffer (readData) to write to
+#ifdef USE_ALLPASS_FOR_GLINT_SIMPLE_DELAY
+				int16_t sampleVal = writeBuffer[sample];
+				int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
+				delayedVal = ( (newSampleVal * m_Feedback) + delayedVal );
+				readDataPtr[sample] = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
+#else // use normal delay
 				readDataPtr[sample] = ( writeBuffer[sample] + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
+#endif
 
 				// write the delayed value to the actual write buffer
 				writeBuffer[sample] = delayedVal;
@@ -303,6 +319,8 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		AllpassCombFilter<int16_t> 	m_DiffusionAPF2;
 		AllpassCombFilter<int16_t> 	m_DiffusionAPF3;
 		AllpassCombFilter<int16_t> 	m_DiffusionAPF4;
+		AllpassCombFilter<int16_t> 	m_DiffusionAPF5;
+		AllpassCombFilter<int16_t> 	m_DiffusionAPF6;
 
 		// low-pass filters
 		OnePoleFilter<int16_t> 		m_LowpassFilter;
@@ -312,6 +330,7 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock1APF1;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock1APF2;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock1APF3;
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock1APF4;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF1;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF2;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF3;
