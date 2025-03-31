@@ -21,10 +21,8 @@
 	#include "FakeStorageDevice.hpp"
 #endif
 
-#define USE_ALLPASS_FOR_GLINT_SIMPLE_DELAY
-
-// this simple delay uses IStorageMedia as opposed to an array
-class GlintSimpleDelay : public IBufferCallback<int16_t>
+// this allpass comb filter uses IStorageMedia as opposed to an array
+class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 {
 	public:
 		enum class DmaStage
@@ -36,7 +34,7 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			SEQUENCE_COMPLETE
 		};
 
-		GlintSimpleDelay (STORAGE* delayBufferStorage, unsigned int maxDelayLength, unsigned int delayLength, int16_t initVal, uint8_t* sharedData) :
+		GlintStorageAllpassCombFilter (STORAGE* delayBufferStorage, unsigned int maxDelayLength, unsigned int delayLength, int16_t initVal, uint8_t* sharedData) :
 			m_DelayLength( maxDelayLength + 1 ), // plus one because one sample is no delay
 			m_DelayBuffer( delayBufferStorage ),
 			m_DelayWriteIncr( 0 ),
@@ -47,7 +45,7 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 			m_DmaStage( DmaStage::SEQUENCE_COMPLETE )
 		{
 #ifdef TARGET_BUILD
-			delayBufferStorage->setDmaTransferCompleteCallback( std::bind(&GlintSimpleDelay::dmaTransferCompleteCallback, this) );
+			delayBufferStorage->setDmaTransferCompleteCallback( std::bind(&GlintStorageAllpassCombFilter::dmaTransferCompleteCallback, this) );
 #endif
 			this->setDelayLength( delayLength );
 
@@ -62,7 +60,7 @@ class GlintSimpleDelay : public IBufferCallback<int16_t>
 
 			m_RunningDelayLineOffset += m_DelayLength;
 		}
-		~GlintSimpleDelay() {}
+		~GlintStorageAllpassCombFilter() {}
 
 		int16_t processSample (int16_t sampleVal)
 		{
@@ -296,7 +294,6 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		~GlintManager() override;
 
 		void setDecayTime (float decayTime); // decayTime should be between 0.0f and 1.0f
-		void setModRate (float modRate); // modRate should be in hertz
 		void setFiltFreq (float filtFreq); // filtFreq should be in hertz
 
 		void call (uint16_t* writeBuffer) override;
@@ -310,7 +307,6 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		unsigned int 			m_StorageMediaSize;
 
 		float 				m_DecayTime;
-		float 				m_ModRate;
 		float 				m_FiltFreq;
 
 		// diffusion network filters
@@ -334,9 +330,10 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF1;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF2;
 		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF3;
-		SimpleDelay<int16_t> 		m_ReverbNetSimpleDelay;
-		GlintSimpleDelay 		m_ReverbNetStorageMediaDelay;
-		float 				m_ModVals[ABUFFER_SIZE]; // for delay length modulation of reverb network block 2 APF 3
+		AllpassCombFilter<int16_t> 	m_ReverbNetBlock2APF4;
+		GlintStorageAllpassCombFilter 	m_ReverbNetStorageMediaAPF;
+
+		int16_t 			m_ReverbNetStorageMediaAPFBuffer[ABUFFER_SIZE]; // buffer for use with GlintStorageAllpassCombFilter
 
 		int16_t 			m_PrevReverbNetVals[ABUFFER_SIZE]; // for feedback into low-pass
 		int16_t 			m_PrevReverbNetBlock2Vals[ABUFFER_SIZE]; // for feedback into reverb block 1
