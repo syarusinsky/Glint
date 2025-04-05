@@ -306,7 +306,7 @@ int main(void)
 
 		uint16_t pot2Val = LLPD::adc_get_channel_value( EFFECT2_ADC_CHANNEL );
 		float pot2Percentage = static_cast<float>( pot2Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::MOD_RATE)) );
+		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::DIFFUSION)) );
 
 		uint16_t pot3Val = LLPD::adc_get_channel_value( EFFECT3_ADC_CHANNEL );
 		float pot3Percentage = static_cast<float>( pot3Val ) * ( 1.0f / 4095.0f );

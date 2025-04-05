@@ -74,7 +74,7 @@ void GlintUiManager::onPotEvent (const PotEvent& potEvent)
 		allowedScatterLeft = m_Pot1StabilizerValue - allowableScatter;
 		allowedScatterRight = m_Pot1StabilizerValue + allowableScatter;
 	}
-	else if ( channelEnum == POT_CHANNEL::MOD_RATE )
+	else if ( channelEnum == POT_CHANNEL::DIFFUSION )
 	{
 		outputVal = percentage; // mod rate
 		potStabilizerBuf = m_Pot2StabilizerBuf;

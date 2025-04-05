@@ -294,6 +294,7 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		~GlintManager() override;
 
 		void setDecayTime (float decayTime); // decayTime should be between 0.0f and 1.0f
+		void setDiffusion (float diffusion); // diffusion should be between 0.0f and 1.0f
 		void setFiltFreq (float filtFreq); // filtFreq should be in hertz
 
 		void call (uint16_t* writeBuffer) override;
@@ -315,8 +316,6 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		AllpassCombFilter<int16_t> 	m_DiffusionAPF2;
 		AllpassCombFilter<int16_t> 	m_DiffusionAPF3;
 		AllpassCombFilter<int16_t> 	m_DiffusionAPF4;
-		AllpassCombFilter<int16_t> 	m_DiffusionAPF5;
-		AllpassCombFilter<int16_t> 	m_DiffusionAPF6;
 
 		// low-pass filters
 		OnePoleFilter<int16_t> 		m_LowpassFilter;

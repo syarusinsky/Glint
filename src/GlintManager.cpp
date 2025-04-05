@@ -19,8 +19,6 @@ GlintManager::GlintManager (STORAGE* delayBufferStorage) :
 	m_DiffusionAPF2( GLINT_DIFFUSE_LEN_2, m_Diffusion, 0 ),
 	m_DiffusionAPF3( GLINT_DIFFUSE_LEN_3, m_Diffusion, 0 ),
 	m_DiffusionAPF4( GLINT_DIFFUSE_LEN_4, m_Diffusion, 0 ),
-	m_DiffusionAPF5( GLINT_DIFFUSE_LEN_5, m_Diffusion, 0 ),
-	m_DiffusionAPF6( GLINT_DIFFUSE_LEN_6, m_Diffusion, 0 ),
 	m_LowpassFilter(),
 	m_ReverbNetModOsc(),
 	m_ReverbNetBlock1APF1( GLINT_REVERBNET1_APF_LEN_1, m_DecayTime, 0 ),
@@ -51,6 +49,11 @@ void GlintManager::setDecayTime (float decayTime)
 	m_DecayTime = decayTime;
 }
 
+void GlintManager::setDiffusion (float diffusion)
+{
+	m_Diffusion = diffusion;
+}
+
 void GlintManager::setFiltFreq (float filtFreq)
 {
 	m_FiltFreq = filtFreq;
@@ -68,15 +71,18 @@ void GlintManager::call (uint16_t* writeBuffer)
 
 	m_NoiseGate.call( writeBufferInt16 );
 
-	m_ReverbNetStorageMediaAPF.setFeedback( m_DecayTime );
-	m_ReverbNetStorageMediaAPF.call( writeBufferInt16 );
-
 	m_LowpassFilter.setCoefficients( m_FiltFreq );
+
+	m_DiffusionAPF1.setFeedbackGain( m_Diffusion );
+	m_DiffusionAPF2.setFeedbackGain( m_Diffusion );
+	m_DiffusionAPF3.setFeedbackGain( m_Diffusion );
+	m_DiffusionAPF4.setFeedbackGain( m_Diffusion );
 
 	m_ReverbNetBlock1APF1.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock1APF2.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock1APF3.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock1APF4.setFeedbackGain( m_DecayTime );
+	m_ReverbNetStorageMediaAPF.setFeedback( m_DecayTime );
 	m_ReverbNetBlock2APF1.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock2APF2.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock2APF3.setFeedbackGain( m_DecayTime );
@@ -96,8 +102,6 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_DiffusionAPF2.call( writeBufferInt16 );
 	m_DiffusionAPF3.call( writeBufferInt16 );
 	m_DiffusionAPF4.call( writeBufferInt16 );
-	m_DiffusionAPF5.call( writeBufferInt16 );
-	m_DiffusionAPF6.call( writeBufferInt16 );
 
 	// sample vals will be the actual output, but we also need to calculate the reverb net output values for feedback
 	memcpy( m_PrevReverbNetVals, writeBufferInt16, ABUFFER_SIZE * sizeof(int16_t) );
@@ -113,6 +117,7 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_ReverbNetBlock1APF2.call( m_PrevReverbNetVals );
 	m_ReverbNetBlock1APF3.call( m_PrevReverbNetVals );
 	m_ReverbNetBlock1APF4.call( m_PrevReverbNetVals );
+	m_ReverbNetStorageMediaAPF.call( m_PrevReverbNetVals );
 	// decay the reverb network samples
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
@@ -143,10 +148,9 @@ void GlintManager::onGlintParameterEvent (const GlintParameterEvent& paramEvent)
 	{
 		this->setDecayTime( valueToSet );
 	}
-	else if ( channelEnum == POT_CHANNEL::MOD_RATE )
+	else if ( channelEnum == POT_CHANNEL::DIFFUSION )
 	{
-		// TODO no longer using mod rate, replace with another feature in the future
-		// this->setModRate( valueToSet );
+		this->setDiffusion( valueToSet );
 	}
 	else if ( channelEnum == POT_CHANNEL::FILT_FREQ )
 	{
