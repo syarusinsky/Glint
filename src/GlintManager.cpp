@@ -66,7 +66,11 @@ void GlintManager::call (uint16_t* writeBuffer)
 	// first offset for noise gate
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		writeBufferInt16[sample] -= 2047;
+		// for hardware dac
+		// writeBufferInt16[sample] -= 2047;
+
+		// for spi dac
+		writeBufferInt16[sample] -= 32767;
 	}
 
 	m_NoiseGate.call( writeBufferInt16 );
@@ -133,8 +137,13 @@ void GlintManager::call (uint16_t* writeBuffer)
 	// offset samples to fit into dac range
 	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
 	{
-		writeBufferInt16[sample] = ( std::abs(writeBufferInt16[sample] + 2047) - std::abs(writeBufferInt16[sample] - 2047) ) / 2;
-		writeBufferInt16[sample] += 2047;
+		// for hardware dac
+		// writeBufferInt16[sample] = ( std::abs(writeBufferInt16[sample] + 2047) - std::abs(writeBufferInt16[sample] - 2047) ) / 2;
+		// writeBufferInt16[sample] += 2047;
+
+		// for spi dac
+		writeBufferInt16[sample] = ( std::abs(writeBufferInt16[sample] + 32767) - std::abs(writeBufferInt16[sample] - 32767) ) / 2;
+		writeBufferInt16[sample] += 32767;
 	}
 }
 
