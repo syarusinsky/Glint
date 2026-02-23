@@ -4,6 +4,14 @@
               cppLanguageStandard="17">
   <MAINGROUP id="Nwhz3w" name="Glint">
     <GROUP id="{98D80E54-6CF9-BEAB-7DA1-8D820991FECF}" name="Source">
+      <FILE id="Ymcrtd" name="AntiAliasingFilter.hpp" compile="0" resource="0"
+            file="../lib/SAL/include/AntiAliasingFilter.hpp"/>
+      <FILE id="WxRoEo" name="SampleRateConverter.hpp" compile="0" resource="0"
+            file="../lib/SAL/include/SampleRateConverter.hpp"/>
+      <FILE id="sn9OSN" name="AntiAliasingFilter.cpp" compile="1" resource="0"
+            file="../lib/SAL/src/AntiAliasingFilter.cpp"/>
+      <FILE id="NPTku4" name="SampleRateConverter.cpp" compile="1" resource="0"
+            file="../lib/SAL/src/SampleRateConverter.cpp"/>
       <FILE id="x2Cbfy" name="Limiter.cpp" compile="1" resource="0" file="../lib/SAL/src/Limiter.cpp"/>
       <FILE id="pISzBz" name="Limiter.hpp" compile="0" resource="0" file="../lib/SAL/include/Limiter.hpp"/>
       <FILE id="EI4pTL" name="IAllocator.cpp" compile="1" resource="0" file="../lib/DevLib/src/IAllocator.cpp"/>

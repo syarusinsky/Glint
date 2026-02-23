@@ -15,6 +15,7 @@
 #include "GlintManager.hpp"
 #include "GlintUiManager.hpp"
 #include "IGlintLCDRefreshEventListener.hpp"
+#include "SampleRateConverter.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -59,6 +60,8 @@ class MainComponent   : public juce::AudioAppComponent, public juce::Slider::Lis
 
 		GlintManager glintManager;
 		GlintUiManager glintUiManager;
+
+		SampleRateConverter<float, uint16_t> sampleRateConverter;
 
 		juce::AudioFormatWriter* writer;
 

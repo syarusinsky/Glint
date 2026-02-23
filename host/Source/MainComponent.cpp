@@ -34,6 +34,7 @@ MainComponent::MainComponent() :
 	fakeStorageDevice( Sram_23K256::SRAM_SIZE * 4 ), // sram size on Gen_FX_SYN boards, with four srams installed
 	glintManager( &fakeStorageDevice ),
 	glintUiManager( Smoll_data, GlintMainImage_data ),
+	sampleRateConverter( 96000, SAMPLE_RATE, 512 ),
 	writer(),
 	decayTimeSldr(),
 	decayTimeLbl(),
@@ -81,7 +82,7 @@ MainComponent::MainComponent() :
 	modRateSldr.setTextValueSuffix( "%" );
 	modRateSldr.addListener( this );
 	addAndMakeVisible( modRateLbl );
-	modRateLbl.setText( "Mod Rate", juce::dontSendNotification );
+	modRateLbl.setText( "Diffusion", juce::dontSendNotification );
 	modRateLbl.attachToComponent( &modRateSldr, true );
 
 	addAndMakeVisible( filtFreqSldr );
@@ -189,6 +190,11 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
 	// but be careful - it will be called on the audio thread, not the GUI thread.
 
 	// For more details, see the help for AudioProcessor::prepareToPlay()
+	sampleRateConverter.setSourceRate( static_cast<unsigned int>(sampleRate) );
+	sampleRateConverter.setSourceBufferSize( samplesPerBlockExpected );
+	sampleRateConverter.resetAAFilters();
+	std::cout << "prepareToPlay called! rate=" << std::to_string(sampleRateConverter.getSourceRate())
+		<< ", bufferSize=" << std::to_string(sampleRateConverter.getSourceBufferSize())	<< std::endl;
 }
 
 void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill)
@@ -203,23 +209,40 @@ void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& buffe
 		float* outBufferL = bufferToFill.buffer->getWritePointer( 0, bufferToFill.startSample );
 		float* outBufferR = bufferToFill.buffer->getWritePointer( 1, bufferToFill.startSample );
 
-		static uint16_t maxOut = 0;
-		static uint16_t minOut = 0;
-		if ( resetMaxAndMins ) { maxOut = 0; minOut = 0; resetMaxAndMins = false; }
-		for ( auto sample = bufferToFill.startSample; sample < bufferToFill.numSamples; ++sample )
+		// if downsampling, anti-alias filter the source
+		if ( ! sampleRateConverter.sourceToTargetIsUpsampling() )
 		{
-			uint16_t sampleToReadBuffer = ( (inBufferL[sample] + 1.0f) * 0.5f ) * 4096.0f;
-			uint16_t sampleOut = sAudioBuffer.getNextSample( sampleToReadBuffer );
-			float sampleOutFloat = static_cast<float>( ((sampleOut / 4096.0f) * 2.0f) - 1.0f );
-			if ( sampleOut > maxOut ) maxOut = sampleOut;
-			if ( sampleOut < minOut ) minOut = sampleOut;
-			outBufferL[sample] = sampleOutFloat;
-			outBufferR[sample] = sampleOutFloat;
+			float* inBufferLNonConst = const_cast<float*>( inBufferL );
+			sampleRateConverter.filterSourceToTargetDownsampling( inBufferLNonConst );
 		}
-		// std::cout << "maxOut: " << std::to_string(maxOut) << std::endl;
-		// std::cout << "minOut: " << std::to_string(minOut) << std::endl;
 
-		sAudioBuffer.pollToFillBuffers();
+		const unsigned int maxTargetBufferSize = static_cast<unsigned int>( std::ceil(sampleRateConverter.getFractionalTargetBufferSize()) );
+		uint16_t targetBuffer[ maxTargetBufferSize ]; // ceil, since can be fractional
+
+		const unsigned int actualTargetBufferSize = sampleRateConverter.convertFromSourceToTargetDownsampling( inBufferL, targetBuffer );
+
+		// then pass this audio into the target
+		for ( unsigned int sample = 0;
+				sample < actualTargetBufferSize;
+				sample++ )
+		{
+			targetBuffer[sample] = sAudioBuffer.getNextSample( targetBuffer[sample] );
+			sAudioBuffer.pollToFillBuffers();
+		}
+
+		// now we need to convert back
+		sampleRateConverter.convertFromTargetToSourceUpsampling( targetBuffer, actualTargetBufferSize, outBufferL );
+
+		// if upsampling, anti-alias filter the source
+		if ( sampleRateConverter.targetToSourceIsUpsampling() )
+		{
+			sampleRateConverter.filterTargetToSourceUpsampling( outBufferL );
+		}
+
+		for ( auto sample = bufferToFill.startSample; sample < bufferToFill.numSamples; sample++ )
+		{
+			outBufferR[sample] = outBufferL[sample];
+		}
 	}
 	catch ( std::exception& e )
 	{
@@ -276,7 +299,7 @@ void MainComponent::sliderValueChanged (juce::Slider* slider)
 		}
 		else if (slider == &modRateSldr)
 		{
-			IPotEventListener::PublishEvent( PotEvent(percentage, static_cast<unsigned int>(POT_CHANNEL::MOD_RATE)) );
+			IPotEventListener::PublishEvent( PotEvent(percentage, static_cast<unsigned int>(POT_CHANNEL::DIFFUSION)) );
 		}
 		else if (slider == &filtFreqSldr)
 		{
