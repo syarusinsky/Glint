@@ -14,6 +14,7 @@
 #include "GlintUiManager.hpp"
 #include "IGlintLCDRefreshEventListener.hpp"
 #include "SampleRateConverter.hpp"
+#include "PresetManager.hpp"
 
 #include <JuceHeader.h>
 
@@ -64,10 +65,18 @@ public:
 
     AudioProcessorValueTreeState& getVTS() { return apvts; }
 
+    // this is a workaround for the fact that vst plugins share memory across multiple
+    // instances, so the static member variables of the event listeners end up sending
+    // events to all instances of the plugin
+    void dispatchEventsForIds (unsigned int processorId, const unsigned int processorEditorId);
+    unsigned int getProcessorId() { return processorId; }
+
 private:
     ::AudioBuffer<uint16_t> sAudioBuffer;
 
     FakeStorageDevice fakeStorageDevice;
+
+    PresetManager presetManager;
 
     GlintManager glintManager;
     GlintUiManager glintUiManager;
@@ -76,6 +85,9 @@ private:
 
     UndoManager undoManager;
     AudioProcessorValueTreeState apvts;
+
+    unsigned int processorId;
+    unsigned int processorEditorId = 0 - 1; // this must be correctly initialized on the create editor function
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GlintVSTAudioProcessor)

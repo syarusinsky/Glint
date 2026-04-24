@@ -10,6 +10,7 @@
 #include "PluginEditor.h"
 
 #include "GlintConstants.hpp"
+#include "GlintPresetUpgrader.hpp"
 #include "CPPFile.hpp"
 #include "SRAM_23K256.hpp"
 
@@ -21,15 +22,17 @@
 GlintVSTAudioProcessor::GlintVSTAudioProcessor()
     : sAudioBuffer(),
       fakeStorageDevice( Sram_23K256::SRAM_SIZE * 4 ), // sram size on Gen_FX_SYN boards, with four srams installed
-      glintManager( &fakeStorageDevice ),
+      presetManager( sizeof(GlintPresetHeader), 20, new CPPFile("GlintPresets.spf") ),
+      glintManager( &fakeStorageDevice, &presetManager ),
       glintUiManager( Smoll_data, GlintMainImage_data ),
       sampleRateConverter( 96000, SAMPLE_RATE, 512 ),
       undoManager(),
       apvts( *this, &undoManager, "PARAMETERS",
-                                  { std::make_unique<AudioParameterFloat> ("decayTime", "Decay Time", NormalisableRange<float> (0.0f, 1.0f), 0),
-                                    std::make_unique<AudioParameterFloat> ("diffusion", "Diffusion", NormalisableRange<float> (0.0f, 1.0f), 0),
-                                    std::make_unique<AudioParameterInt> ("filtFreq", "Filter Freq", 1, 20000, 20000),
-                                  })
+                                  { std::make_unique<AudioParameterFloat> ("effect1", "Decay Time", NormalisableRange<float> (0.0f, 1.0f), 0),
+                                    std::make_unique<AudioParameterFloat> ("effect2", "Diffusion", NormalisableRange<float> (0.0f, 1.0f), 0),
+                                    std::make_unique<AudioParameterInt> ("effect3", "Filter Freq", 1, 20000, 20000),
+                                  }),
+      processorId( IEventListener::getGlobalJuceProcessorId() )
 #ifndef JucePlugin_PreferredChannelConfigurations
       , AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
@@ -41,8 +44,20 @@ GlintVSTAudioProcessor::GlintVSTAudioProcessor()
                        )
 #endif
 {
+    // clear storage device to prevent noise
+    SharedData<uint8_t> data = SharedData<uint8_t>::MakeSharedData( Sram_23K256::SRAM_SIZE * 4 );
+    for ( unsigned int byteNum = 0; byteNum < Sram_23K256::SRAM_SIZE * 4; byteNum++ )
+    {
+        data[byteNum] = 32768;
+    }
+    fakeStorageDevice.writeToMedia( data, 0 );
+
+    // upgrade presets if necessary
+    GlintState initPreset = { 0.0f, 0.0f, 20000.0f };
+    GlintPresetUpgrader presetUpgrader( initPreset, glintManager.getPresetHeader() );
+    presetManager.upgradePresets( &presetUpgrader );
+
     sAudioBuffer.registerCallback( &glintManager );
-    glintUiManager.draw();
 }
 
 GlintVSTAudioProcessor::~GlintVSTAudioProcessor()
@@ -209,6 +224,8 @@ void GlintVSTAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
             channelData[sample] = outBufferL[sample];
         }
     }
+
+    this->dispatchEventsForIds( processorId, processorEditorId );
 }
 
 //==============================================================================
@@ -219,7 +236,11 @@ bool GlintVSTAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* GlintVSTAudioProcessor::createEditor()
 {
-    return new GlintVSTAudioProcessorEditor (*this);
+    GlintVSTAudioProcessorEditor* editor = new GlintVSTAudioProcessorEditor( *this );
+    processorEditorId = editor->getProcessorEditorId();
+    this->dispatchEventsForIds( processorId, processorEditorId );
+
+    return editor;
 }
 
 //==============================================================================
@@ -243,8 +264,42 @@ void GlintVSTAudioProcessor::setStateInformation (const void* data, int sizeInBy
         if (xmlState->hasTagName (apvts.state.getType()))
         {
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+
+            // set initial values
+            juce::AudioParameterFloat* e1 = dynamic_cast<juce::AudioParameterFloat*>( apvts.getParameter("effect1") );
+            juce::AudioParameterInt* e2 = dynamic_cast<juce::AudioParameterInt*>( apvts.getParameter("effect2") );
+            juce::AudioParameterInt* e3 = dynamic_cast<juce::AudioParameterInt*>( apvts.getParameter("effect3") );
+            juce::Range<float> e1Range = e1->getNormalisableRange().getRange();
+            juce::Range<int> e2Range = e2->getRange();
+            juce::Range<int> e3Range = e3->getRange();
+            float effect1SldrPercentage = ( e1->get() - e1Range.getStart()) / (e1Range.getEnd() - e1Range.getStart() );
+            float effect2SldrPercentage = ( e2->get() - e2Range.getStart()) / (e2Range.getEnd() - e2Range.getStart() );
+            float effect3SldrPercentage = ( e3->get() - e3Range.getStart()) / (e3Range.getEnd() - e3Range.getStart() );
+            IPotEventListener::PublishEvent( PotEvent(effect1SldrPercentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT1), true) );
+            IPotEventListener::PublishEvent( PotEvent(effect2SldrPercentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT2), true) );
+            IPotEventListener::PublishEvent( PotEvent(effect3SldrPercentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT3), true) );
+
+            this->dispatchEventsForIds( processorId, processorEditorId );
         }
     }
+}
+
+void GlintVSTAudioProcessor::dispatchEventsForIds (const unsigned int processorId, const unsigned int processorEditorId)
+{
+    // The sequencing of these calls is extremely important and it's possible for other projects that the juceDispatchQueuedEvents function
+    // may need to be called more than once if the event handling of a different event listener publishes new events to an event listener that
+    // has already called it's juceDispatchQueuedEvents function. For example with this project IPotEventListener and IButtonEventListener handling
+    // publishes IGlintParameterEventListener and IGlintParameterEventListener events, so they must be called first. Likewise, the handling of
+    // IGlintParameterEventListener and IGlintLCDRefreshEventListener events publishes IGlintLCDRefreshEventListener events, so those must
+    // be called before IGlintLCDRefreshEventListener. The onus is on the user to sequence these correctly in the most performant way possible.
+    EventDispatcher<IPotEventListener, PotEvent, &IPotEventListener::onPotEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
+    EventDispatcher<IButtonEventListener, ButtonEvent, &IButtonEventListener::onButtonEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
+    EventDispatcher<IGlintParameterEventListener, GlintParameterEvent,
+                    &IGlintParameterEventListener::onGlintParameterEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
+    EventDispatcher<IGlintPresetEventListener, GlintPresetEvent,
+                    &IGlintPresetEventListener::onGlintPresetChangedEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
+    EventDispatcher<IGlintLCDRefreshEventListener, GlintLCDRefreshEvent,
+                    &IGlintLCDRefreshEventListener::onGlintLCDRefreshEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
 }
 
 //==============================================================================

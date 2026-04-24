@@ -9,9 +9,11 @@
 #include "AudioBuffer.hpp"
 #include "GlintManager.hpp"
 #include "GlintUiManager.hpp"
+#include "GlintPresetUpgrader.hpp"
 #include "IPotEventListener.hpp"
 #include "IButtonEventListener.hpp"
 #include "IGlintLCDRefreshEventListener.hpp"
+#include "IGlintPresetEventListener.hpp"
 #include "FrameBuffer.hpp"
 
 // assets
@@ -69,6 +71,48 @@ AudioBuffer<uint16_t>* audioBufferPtr = nullptr;
 #define SPI_DAC_ADC_CS_PIN 	GPIO_PIN::PIN_12
 
 
+// this class is specifically to check if the eeprom has been initialized with the correct code at the end of the eeprom addresses
+class Eeprom_CAT24C64_Manager_Glint : public Eeprom_CAT24C64_Manager
+{
+	public:
+		Eeprom_CAT24C64_Manager_Glint (const I2C_NUM& i2cNum, const std::vector<Eeprom_CAT24C64_AddressConfig>& addressConfigs) :
+			Eeprom_CAT24C64_Manager( i2cNum, addressConfigs ) {}
+		bool needsInitialization() override
+		{
+			for ( unsigned int byte = 0; byte < sizeof(m_InitCode); byte++ )
+			{
+				uint8_t value = this->readByte( m_InitCodeStartAddress + byte );
+				if ( value != m_InitCode[byte] )
+				{
+					LLPD::usart_log( USART_NUM::USART_3, "EEPROM init code not detected, initializing now..." );
+					return true;
+				}
+			}
+			LLPD::usart_log( USART_NUM::USART_3, "EEPROM init code detected, loading preset now..." );
+			return false;
+		}
+		void afterInitialize() override
+		{
+			for ( unsigned int byte = 0; byte < sizeof(m_InitCode); byte++ )
+			{
+				this->writeByte( m_InitCodeStartAddress + byte, m_InitCode[byte] );
+			}
+			for ( unsigned int byte = 0; byte < sizeof(m_InitCode); byte++ )
+			{
+				uint8_t value = this->readByte( m_InitCodeStartAddress + byte );
+				if ( value != m_InitCode[byte] )
+				{
+					LLPD::usart_log( USART_NUM::USART_3, "EEPROM failed to initialize, check connections and setup..." );
+					return;
+				}
+			}
+			LLPD::usart_log( USART_NUM::USART_3, "EEPROM initialized successfully, loading preset now..." );
+		}
+	private:
+		uint8_t m_InitCode[8] = { 0b11100010, 0b10010100, 0b01101001, 0b01111110, 0b11001100, 0b00011110, 0b11110100, 0b11001010 };
+		unsigned int m_InitCodeStartAddress = ( Eeprom_CAT24C64::EEPROM_SIZE * m_Eeproms.size() ) - sizeof( m_InitCode );
+};
+
 // a simple class to handle lcd refresh events
 class Oled_Manager : public IGlintLCDRefreshEventListener
 {
@@ -110,7 +154,11 @@ class Oled_Manager : public IGlintLCDRefreshEventListener
 			}
 			else
 			{
-				m_Oled.displayPartialRowMajor( m_DisplayBuffer, rowEnd, columnEnd, rowStart, columnStart );
+				// TODO right now the partial update isn't working, but this may be an issue with the lcdRefreshEvent
+				// as opposed to the oled code since that's working with armor8, I should fix this in the future
+				// since the full screen update results in an audio pop
+				// m_Oled.displayPartialRowMajor( m_DisplayBuffer, rowEnd, columnEnd, rowStart, columnStart );
+				m_Oled.displayFullRowMajor( m_DisplayBuffer );
 			}
 		}
 
@@ -272,10 +320,22 @@ int main(void)
 		srams.writeByte( sample, 0 );
 	}
 
-	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
+	// EEPROM setup
+	std::vector<Eeprom_CAT24C64_AddressConfig> eepromAddressConfigs;
+	eepromAddressConfigs.emplace_back( EEPROM1_ADDRESS );
+	eepromAddressConfigs.emplace_back( EEPROM2_ADDRESS );
+	Eeprom_CAT24C64_Manager_Glint eeproms( I2C_NUM::I2C_2, eepromAddressConfigs );
+	PresetManager presetManager( sizeof(GlintPresetHeader), 20, &eeproms );
 
-	GlintManager glintManager( &srams );
+	GlintManager glintManager( &srams, &presetManager );
 	GlintUiManager glintUiManager( Smoll_data, GlintMainImage_data );
+
+	// upgrade presets if necessary
+	GlintState initPreset = { 0.0f, 0.0f, 20000.0f };
+	GlintPresetUpgrader presetUpgrader( initPreset, glintManager.getPresetHeader() );
+	presetManager.upgradePresets( &presetUpgrader );
+	// load the first preset
+	glintManager.loadCurrentPreset();
 
 	Oled_Manager oled( glintUiManager.getFrameBuffer()->getPixels() );
 	LLPD::usart_log( USART_NUM::USART_3, "oled initialized..." );
@@ -298,42 +358,24 @@ int main(void)
 	LLPD::gpio_output_set( SPI_DAC_ADC_CS_PORT, SPI_DAC_ADC_CS_PIN, false );
 	LLPD::spi1_dma_master_start( const_cast<uint16_t*>( audioBuffer.getBuffer1() ), ABUFFER_SIZE * 2 );
 
+	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
+
 	while ( true )
 	{
-		// No button interactions
-		// if ( ! LLPD::gpio_input_get(EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN) )
-		// {
-		// 	IButtonEventListener::PublishEvent(
-		// 			ButtonEvent(BUTTON_STATE::PRESSED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_1)) );
-		// }
-		// else
-		// {
-		// 	IButtonEventListener::PublishEvent(
-		// 			ButtonEvent(BUTTON_STATE::RELEASED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_1)) );
-		// }
-
-		// if ( ! LLPD::gpio_input_get(EFFECT2_BUTTON_PORT, EFFECT2_BUTTON_PIN) )
-		// {
-		// 	IButtonEventListener::PublishEvent(
-		// 			ButtonEvent(BUTTON_STATE::PRESSED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_2)) );
-		// }
-		// else
-		// {
-		// 	IButtonEventListener::PublishEvent(
-		// 			ButtonEvent(BUTTON_STATE::RELEASED, static_cast<unsigned int>(BUTTON_CHANNEL::EFFECT_BTN_2)) );
-		// }
+		glintUiManager.processEffect1Btn( ! LLPD::gpio_input_get(EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN) );
+		glintUiManager.processEffect2Btn( ! LLPD::gpio_input_get(EFFECT2_BUTTON_PORT, EFFECT2_BUTTON_PIN) );
 
 		uint16_t pot1Val = LLPD::adc_get_channel_value( EFFECT1_ADC_CHANNEL );
 		float pot1Percentage = static_cast<float>( pot1Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot1Percentage, static_cast<unsigned int>(POT_CHANNEL::DECAY_TIME)) );
+		IPotEventListener::PublishEvent( PotEvent(pot1Percentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT1)) );
 
 		uint16_t pot2Val = LLPD::adc_get_channel_value( EFFECT2_ADC_CHANNEL );
 		float pot2Percentage = static_cast<float>( pot2Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::DIFFUSION)) );
+		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT1)) );
 
 		uint16_t pot3Val = LLPD::adc_get_channel_value( EFFECT3_ADC_CHANNEL );
 		float pot3Percentage = static_cast<float>( pot3Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot3Percentage, static_cast<unsigned int>(POT_CHANNEL::FILT_FREQ)) );
+		IPotEventListener::PublishEvent( PotEvent(pot3Percentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT1)) );
 
 		// code for interrupt based audio
 		// audioBuffer.pollToFillBuffers();

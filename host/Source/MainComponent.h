@@ -15,6 +15,7 @@
 #include "GlintManager.hpp"
 #include "GlintUiManager.hpp"
 #include "IGlintLCDRefreshEventListener.hpp"
+#include "PresetManager.hpp"
 #include "SampleRateConverter.hpp"
 
 #include <iostream>
@@ -45,6 +46,10 @@ class MainComponent   : public juce::AudioAppComponent, public juce::Slider::Lis
 		void paint (juce::Graphics& g) override;
 		void resized() override;
 
+		//==============================================================================
+		bool keyPressed (const juce::KeyPress& k) override;
+		bool keyStateChanged (bool isKeyDown) override;
+
 		void sliderValueChanged (juce::Slider* slider) override;
 		void buttonClicked (juce::Button* button) override;
 		void updateToggleState (juce::Button* button);
@@ -58,6 +63,8 @@ class MainComponent   : public juce::AudioAppComponent, public juce::Slider::Lis
 
 		FakeStorageDevice fakeStorageDevice;
 
+		PresetManager presetManager;
+
 		GlintManager glintManager;
 		GlintUiManager glintUiManager;
 
@@ -65,21 +72,19 @@ class MainComponent   : public juce::AudioAppComponent, public juce::Slider::Lis
 
 		juce::AudioFormatWriter* writer;
 
-		juce::Slider decayTimeSldr;
-		juce::Label decayTimeLbl;
+		juce::Slider effect1Sldr;
+		juce::Label effect1Lbl;
 
-		juce::Slider modRateSldr;
-		juce::Label modRateLbl;
+		juce::Slider effect2Sldr;
+		juce::Label effect2Lbl;
 
-		juce::Slider filtFreqSldr;
-		juce::Label filtFreqLbl;
+		juce::Slider effect3Sldr;
+		juce::Label effect3Lbl;
+
+		juce::TextButton effect1Btn;
+		juce::TextButton effect2Btn;
 
 		juce::TextButton audioSettingsBtn;
-
-		juce::TextButton prevPresetBtn;
-		juce::Label presetNumLbl;
-		juce::TextButton nextPresetBtn;
-		juce::TextButton writePresetBtn;
 
 		AudioSettingsComponent audioSettingsComponent;
 

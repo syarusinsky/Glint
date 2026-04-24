@@ -4,6 +4,14 @@
               cppLanguageStandard="17">
   <MAINGROUP id="Nwhz3w" name="Glint">
     <GROUP id="{98D80E54-6CF9-BEAB-7DA1-8D820991FECF}" name="Source">
+      <FILE id="mVRWxA" name="IGlintPresetEventListener.cpp" compile="1"
+            resource="0" file="../src/IGlintPresetEventListener.cpp"/>
+      <FILE id="IE8G5l" name="GlintPresetUpgrader.cpp" compile="1" resource="0"
+            file="../src/GlintPresetUpgrader.cpp"/>
+      <FILE id="FEIPFN" name="GlintPresetUpgrader.hpp" compile="0" resource="0"
+            file="../include/GlintPresetUpgrader.hpp"/>
+      <FILE id="pHtCr3" name="IGlintPresetEventListener.hpp" compile="0"
+            resource="0" file="../include/IGlintPresetEventListener.hpp"/>
       <FILE id="Ymcrtd" name="AntiAliasingFilter.hpp" compile="0" resource="0"
             file="../lib/SAL/include/AntiAliasingFilter.hpp"/>
       <FILE id="WxRoEo" name="SampleRateConverter.hpp" compile="0" resource="0"

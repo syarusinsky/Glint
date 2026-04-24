@@ -21,6 +21,36 @@
 	#include "FakeStorageDevice.hpp"
 #endif
 
+class PresetManager;
+
+// the GlintState struct makes saving states for presets easier, since it's easily serializable
+struct GlintState
+{
+	float m_DecayTime;
+	float m_Diffusion;
+	float m_FiltFreq;
+};
+
+// the GlintPresetHeader is intended to be used as a header for the PresetManager, it tracks the preset version
+struct GlintPresetHeader
+{
+	int versionMajor;
+	int versionMinor;
+	int versionPatch;
+
+	bool presetsFileInitialized;
+
+	bool operator!= (const GlintPresetHeader& other)
+	{
+		if (versionMajor == other.versionMajor && versionMinor == other.versionMinor && versionPatch == other.versionPatch)
+		{
+			return false;
+		}
+
+		return true;
+	}
+};
+
 // this allpass comb filter uses IStorageMedia as opposed to an array
 class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 {
@@ -58,7 +88,10 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 				m_DelayBuffer->writeByte( writeOffset + 1, writeByte2 );
 			}
 
-			m_RunningDelayLineOffset += m_DelayLength;
+			// TODO this will be necessary if we create more than one instance of this class with the same storage device,
+			// but right now we're not doing that and this line messes with vst plugins since it's static and shared
+			// among multiple instances of the plugin
+			// m_RunningDelayLineOffset += m_DelayLength;
 		}
 		~GlintStorageAllpassCombFilter() {}
 
@@ -71,14 +104,9 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 			int16_t delayedVal = ( readByte1 << 8 ) | ( readByte2 );
 
 			// write current sample value
-#ifdef USE_ALLPASS_FOR_GLINT_SIMPLE_DELAY
 			int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
 			delayedVal = ( (newSampleVal * m_Feedback) + delayedVal );
 			int16_t outVal = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
-#else // using normal delay
-			sampleVal = ( sampleVal + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
-			int16_t outVal = delayedVal;
-#endif
 			unsigned int writeOffset = ( m_DelayLineOffset + m_DelayWriteIncr ) * sizeof(int16_t);
 			uint8_t writeByte1 = ( sampleVal >> 8 );
 			uint8_t writeByte2 = ( sampleVal & 0b11111111 );
@@ -176,14 +204,10 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 				int16_t delayedVal = readDataPtr[sample];
 
 				// use the same buffer (readData) to write to
-#ifdef USE_ALLPASS_FOR_GLINT_SIMPLE_DELAY
 				int16_t sampleVal = writeBuffer[sample];
 				int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
 				delayedVal = ( (newSampleVal * m_Feedback) + delayedVal );
 				readDataPtr[sample] = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
-#else // use normal delay
-				readDataPtr[sample] = ( writeBuffer[sample] + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
-#endif
 
 				// write the delayed value to the actual write buffer
 				writeBuffer[sample] = delayedVal;
@@ -290,12 +314,18 @@ private:
 class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEventListener
 {
 	public:
-		GlintManager (STORAGE* delayBufferStorage);
+		GlintManager (STORAGE* delayBufferStorage, PresetManager* presetManager);
 		~GlintManager() override;
 
 		void setDecayTime (float decayTime); // decayTime should be between 0.0f and 1.0f
 		void setDiffusion (float diffusion); // diffusion should be between 0.0f and 1.0f
 		void setFiltFreq (float filtFreq); // filtFreq should be in hertz
+
+		GlintState getState();
+		void setState (const GlintState& state);
+		void loadCurrentPreset();
+
+		GlintPresetHeader getPresetHeader();
 
 		void call (uint16_t* writeBuffer) override;
 
@@ -306,6 +336,9 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 
 		STORAGE* 			m_StorageMedia; // where the static delay buffers sit
 		unsigned int 			m_StorageMediaSize;
+
+		PresetManager* 			m_PresetManager;
+		GlintPresetHeader 		m_PresetHeader;
 
 		float 				m_DecayTime;
 		float 				m_FiltFreq;

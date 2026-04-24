@@ -2,16 +2,20 @@
 
 #include "GlintConstants.hpp"
 #include "SRAM_23K256.hpp"
+#include "PresetManager.hpp"
+#include "IGlintPresetEventListener.hpp"
 
 #include <string.h>
 #include <cmath>
 
 unsigned int GlintStorageAllpassCombFilter::m_RunningDelayLineOffset = 0;
 
-GlintManager::GlintManager (STORAGE* delayBufferStorage) :
+GlintManager::GlintManager (STORAGE* delayBufferStorage, PresetManager* presetManager) :
 	m_NoiseGate( 0.02f, 100.0f, 100 ),
 	m_StorageMedia( delayBufferStorage ),
 	m_StorageMediaSize( (Sram_23K256::SRAM_SIZE * 4) / sizeof(uint16_t) ), // size of 4 srams installed on Gen_FX_SYN rev 2
+	m_PresetManager( presetManager ),
+	m_PresetHeader( {1, 0, 0, true} ),
 	m_DecayTime( 0.0f ),
 	m_FiltFreq( 20000.0f ),
 	m_Diffusion( 0.913f ),
@@ -57,6 +61,34 @@ void GlintManager::setDiffusion (float diffusion)
 void GlintManager::setFiltFreq (float filtFreq)
 {
 	m_FiltFreq = filtFreq;
+}
+
+GlintState GlintManager::getState()
+{
+	GlintState state = { m_DecayTime, m_Diffusion, m_FiltFreq };
+
+	return state;
+}
+
+void GlintManager::setState (const GlintState& state)
+{
+	this->setDecayTime( state.m_DecayTime );
+	this->setDiffusion( state.m_Diffusion );
+	this->setFiltFreq( state.m_FiltFreq );
+}
+
+void GlintManager::loadCurrentPreset()
+{
+	if ( m_PresetManager )
+	{
+		GlintState preset = m_PresetManager->retrievePreset<GlintState>( m_PresetManager->getCurrentPresetNum() );
+		this->setState( preset );
+	}
+}
+
+GlintPresetHeader GlintManager::getPresetHeader()
+{
+	return m_PresetHeader;
 }
 
 void GlintManager::call (uint16_t* writeBuffer)
@@ -150,19 +182,49 @@ void GlintManager::call (uint16_t* writeBuffer)
 void GlintManager::onGlintParameterEvent (const GlintParameterEvent& paramEvent)
 {
 	unsigned int channel = paramEvent.getChannel();
-	POT_CHANNEL channelEnum = static_cast<POT_CHANNEL>( channel );
+	PARAM_CHANNEL channelEnum = static_cast<PARAM_CHANNEL>( channel );
 	float valueToSet = paramEvent.getValue();
 
-	if ( channelEnum == POT_CHANNEL::DECAY_TIME )
+	if ( channelEnum == PARAM_CHANNEL::DECAY_TIME )
 	{
 		this->setDecayTime( valueToSet );
 	}
-	else if ( channelEnum == POT_CHANNEL::DIFFUSION )
+	else if ( channelEnum == PARAM_CHANNEL::DIFFUSION )
 	{
 		this->setDiffusion( valueToSet );
 	}
-	else if ( channelEnum == POT_CHANNEL::FILT_FREQ )
+	else if ( channelEnum == PARAM_CHANNEL::FILT_FREQ )
 	{
 		this->setFiltFreq( valueToSet );
+	}
+	else if ( channelEnum == PARAM_CHANNEL::NEXT_PRESET )
+	{
+		if ( m_PresetManager )
+		{
+			GlintState preset = m_PresetManager->nextPreset<GlintState>();
+			this->setState( preset );
+			IGlintPresetEventListener::PublishEvent(
+						GlintPresetEvent(this->getState(), m_PresetManager->getCurrentPresetNum(), 0) );
+		}
+	}
+	else if ( channelEnum == PARAM_CHANNEL::PREV_PRESET )
+	{
+		if ( m_PresetManager )
+		{
+			GlintState preset = m_PresetManager->prevPreset<GlintState>();
+			this->setState( preset );
+			IGlintPresetEventListener::PublishEvent(
+						GlintPresetEvent(this->getState(), m_PresetManager->getCurrentPresetNum(), 0) );
+		}
+	}
+	else if ( channelEnum == PARAM_CHANNEL::WRITE_PRESET )
+	{
+		if ( m_PresetManager )
+		{
+			GlintState presetToWrite = this->getState();
+			m_PresetManager->writePreset<GlintState>( presetToWrite, m_PresetManager->getCurrentPresetNum() );
+			IGlintPresetEventListener::PublishEvent(
+						GlintPresetEvent(this->getState(), m_PresetManager->getCurrentPresetNum(), 0) );
+		}
 	}
 }

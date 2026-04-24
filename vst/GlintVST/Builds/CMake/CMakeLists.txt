@@ -74,8 +74,10 @@ target_sources(GlintVST
         ../../../Source/PluginProcessor.cpp
         ../../../../src/GlintManager.cpp
         ../../../../src/GlintUiManager.cpp
+        ../../../../src/GlintPresetUpgrader.cpp
         ../../../../src/IGlintLCDRefreshEventListener.cpp
         ../../../../src/IGlintParameterEventListener.cpp
+        ../../../../src/IGlintPresetEventListener.cpp
         ../../../../lib/SAL/src/AntiAliasingFilter.cpp
         ../../../../lib/SAL/src/SampleRateConverter.cpp
         ../../../../lib/SAL/src/AudioBuffer.cpp
@@ -108,9 +110,6 @@ target_include_directories(GlintVST
         ../../../../lib/SIGL/include
         ../../../../lib/STM32f302x8-HAL/llpd/include)
 
-get_target_property(MY_INCLUDES GlintVST INCLUDE_DIRECTORIES)
-message(STATUS "Include directories for MyTargetName: ${MY_INCLUDES}")
-
 # `target_compile_definitions` adds some preprocessor definitions to our target. In a Projucer
 # project, these might be passed in the 'Preprocessor Definitions' field. JUCE modules also make use
 # of compile definitions to switch certain features on/off, so if there's a particular feature you
@@ -138,7 +137,8 @@ target_compile_definitions(GlintVST
         JUCE_MINGW=1
         JUCE_LINUX=0
         DO_NOT_SET_USING_NAMESPACE_JUCE
-        SOFTWARE_RENDERING)
+        SOFTWARE_RENDERING
+        VST_BUILD)
 
 # If your target needs extra binary assets, you can add them here. The first argument is the name of
 # a new static library target that will include all the binary resources. There is an optional
