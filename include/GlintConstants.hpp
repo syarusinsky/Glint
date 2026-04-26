@@ -9,13 +9,13 @@ const unsigned int GLINT_DIFFUSE_LEN_3 = 293;
 const unsigned int GLINT_DIFFUSE_LEN_4 = 373;
 
 const unsigned int GLINT_REVERBNET1_APF_LEN_1 = 2111;
-const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 1487;
+const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 1357;
 const unsigned int GLINT_REVERBNET1_APF_LEN_3 = 887;
-const unsigned int GLINT_REVERBNET1_APF_LEN_4 = 1159;
+const unsigned int GLINT_REVERBNET1_APF_LEN_4 = 1149;
 const unsigned int GLINT_REVERBNET2_APF_LEN_1 = 751;
-const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 2253;
+const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 2053;
 const unsigned int GLINT_REVERBNET2_APF_LEN_3 = 1307;
-const unsigned int GLINT_REVERBNET2_APF_LEN_4 = 2719;
+const unsigned int GLINT_REVERBNET2_APF_LEN_4 = 2787;
 const unsigned int GLINT_REVERBNET_SMAF_LEN   = 3637;
 
 const float GLINT_MAX_FILT_FREQ = 20000.0f;

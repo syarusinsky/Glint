@@ -85,10 +85,13 @@ class Eeprom_CAT24C64_Manager_Glint : public Eeprom_CAT24C64_Manager
 				if ( value != m_InitCode[byte] )
 				{
 					LLPD::usart_log( USART_NUM::USART_3, "EEPROM init code not detected, initializing now..." );
+
 					return true;
 				}
 			}
+
 			LLPD::usart_log( USART_NUM::USART_3, "EEPROM init code detected, loading preset now..." );
+
 			return false;
 		}
 		void afterInitialize() override
@@ -103,13 +106,16 @@ class Eeprom_CAT24C64_Manager_Glint : public Eeprom_CAT24C64_Manager
 				if ( value != m_InitCode[byte] )
 				{
 					LLPD::usart_log( USART_NUM::USART_3, "EEPROM failed to initialize, check connections and setup..." );
+
 					return;
 				}
 			}
+
 			LLPD::usart_log( USART_NUM::USART_3, "EEPROM initialized successfully, loading preset now..." );
 		}
+
 	private:
-		uint8_t m_InitCode[8] = { 0b11100010, 0b10010100, 0b01101001, 0b01111110, 0b11001100, 0b00011110, 0b11110100, 0b11001010 };
+		uint8_t m_InitCode[8] = { 0b10010100, 0b11100010, 0b01101001, 0b01111110, 0b00011110, 0b11001100, 0b11110100, 0b11001010 };
 		unsigned int m_InitCodeStartAddress = ( Eeprom_CAT24C64::EEPROM_SIZE * m_Eeproms.size() ) - sizeof( m_InitCode );
 };
 
@@ -221,8 +227,8 @@ int main(void)
 	// disable the unused pins
 	disableUnusedPins();
 
-	// i2c setup (72MHz source 1000KHz clock 0x00A00D26)
-	LLPD::i2c_master_setup( I2C_NUM::I2C_2, 0x00A00D26 );
+	// i2c setup (72MHz source 100KHz clock 0x00901D23)
+	LLPD::i2c_master_setup( I2C_NUM::I2C_2, 0x00901D23 );
 	LLPD::usart_log( USART_NUM::USART_3, "I2C initialized..." );
 
 	// spi init (36MHz SPI2 source 18MHz clock)
@@ -325,15 +331,19 @@ int main(void)
 	eepromAddressConfigs.emplace_back( EEPROM1_ADDRESS );
 	eepromAddressConfigs.emplace_back( EEPROM2_ADDRESS );
 	Eeprom_CAT24C64_Manager_Glint eeproms( I2C_NUM::I2C_2, eepromAddressConfigs );
+
 	PresetManager presetManager( sizeof(GlintPresetHeader), 20, &eeproms );
 
 	GlintManager glintManager( &srams, &presetManager );
 	GlintUiManager glintUiManager( Smoll_data, GlintMainImage_data );
 
-	// upgrade presets if necessary
-	GlintState initPreset = { 0.0f, 0.0f, 20000.0f };
-	GlintPresetUpgrader presetUpgrader( initPreset, glintManager.getPresetHeader() );
-	presetManager.upgradePresets( &presetUpgrader );
+	// upgrade presets if necessary (scope to save on memory)
+	{
+		GlintState initPreset = { 0.0f, 0.0f, 20000.0f };
+		GlintPresetUpgrader presetUpgrader( initPreset, glintManager.getPresetHeader() );
+		presetManager.upgradePresets( &presetUpgrader );
+	}
+
 	// load the first preset
 	glintManager.loadCurrentPreset();
 
