@@ -4,6 +4,24 @@
               cppLanguageStandard="17">
   <MAINGROUP id="Nwhz3w" name="Glint">
     <GROUP id="{98D80E54-6CF9-BEAB-7DA1-8D820991FECF}" name="Source">
+      <FILE id="wcbHNC" name="IKeyEventListener.cpp" compile="1" resource="0"
+            file="../lib/SAL/src/IKeyEventListener.cpp"/>
+      <FILE id="hrwqMD" name="IMidiEventListener.cpp" compile="1" resource="0"
+            file="../lib/SAL/src/IMidiEventListener.cpp"/>
+      <FILE id="ALY406" name="IPitchEventListener.cpp" compile="1" resource="0"
+            file="../lib/SAL/src/IPitchEventListener.cpp"/>
+      <FILE id="iElsyq" name="ISalSysexEventListener.cpp" compile="1" resource="0"
+            file="../lib/SAL/src/ISalSysexEventListener.cpp"/>
+      <FILE id="JKUGKI" name="MidiHandler.cpp" compile="1" resource="0" file="../lib/SAL/src/MidiHandler.cpp"/>
+      <FILE id="md97lH" name="IKeyEventListener.hpp" compile="0" resource="0"
+            file="../lib/SAL/include/IKeyEventListener.hpp"/>
+      <FILE id="SuM593" name="IMidiEventListener.hpp" compile="0" resource="0"
+            file="../lib/SAL/include/IMidiEventListener.hpp"/>
+      <FILE id="STFv4D" name="IPitchEventListener.hpp" compile="0" resource="0"
+            file="../lib/SAL/include/IPitchEventListener.hpp"/>
+      <FILE id="exOd0y" name="ISalSysexEventListener.hpp" compile="0" resource="0"
+            file="../lib/SAL/include/ISalSysexEventListener.hpp"/>
+      <FILE id="xWFbd9" name="MidiHandler.hpp" compile="0" resource="0" file="../lib/SAL/include/MidiHandler.hpp"/>
       <FILE id="mVRWxA" name="IGlintPresetEventListener.cpp" compile="1"
             resource="0" file="../src/IGlintPresetEventListener.cpp"/>
       <FILE id="IE8G5l" name="GlintPresetUpgrader.cpp" compile="1" resource="0"
@@ -164,5 +182,6 @@
   <LIVE_SETTINGS>
     <LINUX/>
   </LIVE_SETTINGS>
-  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_INCLUDE_ZLIB_CODE="1"
+               JUCE_WEB_BROWSER="0"/>
 </JUCERPROJECT>

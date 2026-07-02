@@ -75,6 +75,9 @@ GlintVSTAudioProcessorEditor::~GlintVSTAudioProcessorEditor()
 void GlintVSTAudioProcessorEditor::timerCallback()
 {
     GlintUiManager& glintUiManager = audioProcessor.getGlintUiManager();
+
+    glintUiManager.tickForEffectBtn2Hold( 33000.0f );
+
     glintUiManager.processEffect1Btn( effect1Btn.isDown() );
 
     // since the effect button holding logic requires the sequencing of the button events to be in order, we need to dispatch here as well
@@ -167,10 +170,13 @@ void GlintVSTAudioProcessorEditor::onGlintLCDRefreshEvent (const GlintLCDRefresh
 
 void GlintVSTAudioProcessorEditor::onGlintPresetChangedEvent (const GlintPresetEvent& presetEvent)
 {
-    GlintState state = presetEvent.getPreset();
-    effect1Sldr.setValue( state.m_DecayTime );
-    effect2Sldr.setValue( state.m_Diffusion );
-    effect3Sldr.setValue( state.m_FiltFreq );
+    if ( presetEvent.getType() == GlintPresetEventTypeEnum::LOAD_PRESET || presetEvent.getType() == GlintPresetEventTypeEnum::FINISHED_SENDING_OR_RECEIVING_PRESETS )
+    {
+        GlintState state = presetEvent.getPreset();
+        effect1Sldr.setValue( state.m_DecayTime );
+        effect2Sldr.setValue( state.m_Diffusion );
+        effect3Sldr.setValue( state.m_FiltFreq );
+    }
 }
 
 void GlintVSTAudioProcessorEditor::copyFrameBufferToImage (unsigned int xStart, unsigned int yStart, unsigned int xEnd, unsigned int yEnd)

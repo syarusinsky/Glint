@@ -5,6 +5,7 @@
 #include "IStorageMedia.hpp"
 #include "AudioConstants.hpp"
 #include "IGlintParameterEventListener.hpp"
+#include "ISalSysexEventListener.hpp"
 #include "AllpassCombFilter.hpp"
 #include "OnePoleFilter.hpp"
 #include "SimpleDelay.hpp"
@@ -21,6 +22,7 @@
 	#include "FakeStorageDevice.hpp"
 #endif
 
+class MidiHandler;
 class PresetManager;
 
 // the GlintState struct makes saving states for presets easier, since it's easily serializable
@@ -311,10 +313,10 @@ private:
 		volatile DmaStage 		m_DmaStage;
 };
 
-class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEventListener
+class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEventListener, public ISalSysexEventListener
 {
 	public:
-		GlintManager (STORAGE* delayBufferStorage, PresetManager* presetManager);
+		GlintManager (STORAGE* delayBufferStorage, MidiHandler* midiHandler, PresetManager* presetManager);
 		~GlintManager() override;
 
 		void setDecayTime (float decayTime); // decayTime should be between 0.0f and 1.0f
@@ -330,6 +332,9 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		void call (uint16_t* writeBuffer) override;
 
 		void onGlintParameterEvent (const GlintParameterEvent& paramEvent) override;
+		void onSalSysexEvent( const SalSysexEvent& salSysexEvent) override;
+
+		uint8_t getDevId() { return m_DevId; }
 
 	private:
 		NoiseGate<int16_t> 		m_NoiseGate;
@@ -337,6 +342,7 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		STORAGE* 			m_StorageMedia; // where the static delay buffers sit
 		unsigned int 			m_StorageMediaSize;
 
+		MidiHandler* 			m_MidiHandler;
 		PresetManager* 			m_PresetManager;
 		GlintPresetHeader 		m_PresetHeader;
 
@@ -369,6 +375,17 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 
 		int16_t 			m_PrevReverbNetVals[ABUFFER_SIZE]; // for feedback into low-pass
 		int16_t 			m_PrevReverbNetBlock2Vals[ABUFFER_SIZE]; // for feedback into reverb block 1
+
+		GlintState 			m_PresetToSendOrReceive;
+		unsigned int 			m_PresetToSendOrReceiveNum;
+		uint8_t 			m_DevId;
+		uint8_t 			m_SenderId; // the other unit's id in the preset exchange
+		uint8_t 			m_RequestedPresetNum;
+		bool 				m_SendingOrReceivingAllPresets = false;
+		unsigned int 			m_NibbleIndex = 0;
+
+		uint8_t generateRandomDevId();
+		uint16_t getNumNibblesInPreset();
 };
 
 #endif // GLINTMANAGER_HPP

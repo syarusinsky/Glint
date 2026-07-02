@@ -16,6 +16,7 @@
 #include "GlintUiManager.hpp"
 #include "IGlintLCDRefreshEventListener.hpp"
 #include "PresetManager.hpp"
+#include "MidiHandler.hpp"
 #include "SampleRateConverter.hpp"
 
 #include <iostream>
@@ -27,7 +28,7 @@
    your controls and content.
    */
 class MainComponent   : public juce::AudioAppComponent, public juce::Slider::Listener, public juce::Button::Listener,
-			public juce::Timer, public IGlintLCDRefreshEventListener
+			public juce::MidiInputCallback, public juce::Timer, public IGlintLCDRefreshEventListener
 {
 	public:
 		//==============================================================================
@@ -54,16 +55,25 @@ class MainComponent   : public juce::AudioAppComponent, public juce::Slider::Lis
 		void buttonClicked (juce::Button* button) override;
 		void updateToggleState (juce::Button* button);
 
+		void setMidiInput (int index);
+		void setMidiOutput (int index);
+		void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override;
+		void handleOutgoingMidiMessages();
+
 		void onGlintLCDRefreshEvent (const GlintLCDRefreshEvent& lcdRefreshEvent) override;
 
 	private:
 		//==============================================================================
 		// Your private member variables go here...
+		int lastInputIndex;
+		int lastOutputIndex;
+		std::unique_ptr<juce::MidiOutput> activeMidiOutput;
 		::AudioBuffer<uint16_t> sAudioBuffer;
 
 		FakeStorageDevice fakeStorageDevice;
 
 		PresetManager presetManager;
+		MidiHandler midiHandler;
 
 		GlintManager glintManager;
 		GlintUiManager glintUiManager;
@@ -83,6 +93,11 @@ class MainComponent   : public juce::AudioAppComponent, public juce::Slider::Lis
 
 		juce::TextButton effect1Btn;
 		juce::TextButton effect2Btn;
+
+		juce::ComboBox midiInputList;
+		juce::Label midiInputListLbl;
+		juce::ComboBox midiOutputList;
+		juce::Label midiOutputListLbl;
 
 		juce::TextButton audioSettingsBtn;
 

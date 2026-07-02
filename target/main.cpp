@@ -15,6 +15,7 @@
 #include "IGlintLCDRefreshEventListener.hpp"
 #include "IGlintPresetEventListener.hpp"
 #include "FrameBuffer.hpp"
+#include "MidiHandler.hpp"
 
 // assets
 #include "GlintMainImage.h"
@@ -27,6 +28,7 @@
 // global variables
 volatile bool glintReady = false; // should be set to true after everything has been initialized
 AudioBuffer<uint16_t>* audioBufferPtr = nullptr;
+MidiHandler* volatile midiHandlerPtr = nullptr;
 
 // peripheral defines
 // #define OP_AMP_PORT 		GPIO_PORT::A
@@ -69,6 +71,7 @@ AudioBuffer<uint16_t>* audioBufferPtr = nullptr;
 #define OLED_CS_PIN 		GPIO_PIN::PIN_9
 #define SPI_DAC_ADC_CS_PORT 	GPIO_PORT::A
 #define SPI_DAC_ADC_CS_PIN 	GPIO_PIN::PIN_12
+#define MIDI_USART_NUM 		USART_NUM::USART_3 // may be used for logging instead with usart pins on board
 
 
 // this class is specifically to check if the eeprom has been initialized with the correct code at the end of the eeprom addresses
@@ -84,13 +87,13 @@ class Eeprom_CAT24C64_Manager_Glint : public Eeprom_CAT24C64_Manager
 				uint8_t value = this->readByte( m_InitCodeStartAddress + byte );
 				if ( value != m_InitCode[byte] )
 				{
-					LLPD::usart_log( USART_NUM::USART_3, "EEPROM init code not detected, initializing now..." );
+					// LLPD::usart_log( MIDI_USART_NUM, "EEPROM init code not detected, initializing now..." );
 
 					return true;
 				}
 			}
 
-			LLPD::usart_log( USART_NUM::USART_3, "EEPROM init code detected, loading preset now..." );
+			// LLPD::usart_log( MIDI_USART_NUM, "EEPROM init code detected, loading preset now..." );
 
 			return false;
 		}
@@ -105,13 +108,13 @@ class Eeprom_CAT24C64_Manager_Glint : public Eeprom_CAT24C64_Manager
 				uint8_t value = this->readByte( m_InitCodeStartAddress + byte );
 				if ( value != m_InitCode[byte] )
 				{
-					LLPD::usart_log( USART_NUM::USART_3, "EEPROM failed to initialize, check connections and setup..." );
+					// LLPD::usart_log( MIDI_USART_NUM, "EEPROM failed to initialize, check connections and setup..." );
 
 					return;
 				}
 			}
 
-			LLPD::usart_log( USART_NUM::USART_3, "EEPROM initialized successfully, loading preset now..." );
+			// LLPD::usart_log( MIDI_USART_NUM, "EEPROM initialized successfully, loading preset now..." );
 		}
 
 	private:
@@ -220,30 +223,32 @@ int main(void)
 	LLPD::gpio_output_set( SPI_DAC_ADC_CS_PORT, SPI_DAC_ADC_CS_PIN, true );
 
 	// USART setup
-	LLPD::usart_init( USART_NUM::USART_3, USART_WORD_LENGTH::BITS_8, USART_PARITY::EVEN, USART_CONF::TX_AND_RX,
-				USART_STOP_BITS::BITS_1, SYS_CLOCK_FREQUENCY, 9600 );
-	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN starting up -----------------------------" );
+	// LLPD::usart_init( MIDI_USART_NUM, USART_WORD_LENGTH::BITS_8, USART_PARITY::EVEN, USART_CONF::TX_AND_RX,
+	// 			USART_STOP_BITS::BITS_1, SYS_CLOCK_FREQUENCY, 9600 );
+	LLPD::usart_init( MIDI_USART_NUM, USART_WORD_LENGTH::BITS_8, USART_PARITY::EVEN, USART_CONF::TX_AND_RX,
+				USART_STOP_BITS::BITS_1, SYS_CLOCK_FREQUENCY, 31250 );
+	// LLPD::usart_log( MIDI_USART_NUM, "Gen_FX_SYN starting up -----------------------------" );
 
 	// disable the unused pins
 	disableUnusedPins();
 
 	// i2c setup (72MHz source 100KHz clock 0x00901D23)
 	LLPD::i2c_master_setup( I2C_NUM::I2C_2, 0x00901D23 );
-	LLPD::usart_log( USART_NUM::USART_3, "I2C initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "I2C initialized..." );
 
 	// spi init (36MHz SPI2 source 18MHz clock)
 	LLPD::spi_master_init( SPI_NUM::SPI_1, SPI_BAUD_RATE::APB1CLK_DIV_BY_32, SPI_CLK_POL::LOW_IDLE, SPI_CLK_PHASE::FIRST,
 				SPI_DUPLEX::FULL, SPI_FRAME_FORMAT::MSB_FIRST, SPI_DATA_SIZE::BITS_16 ); // spi dac/adc
 	LLPD::spi_master_init( SPI_NUM::SPI_2, SPI_BAUD_RATE::APB1CLK_DIV_BY_2, SPI_CLK_POL::LOW_IDLE, SPI_CLK_PHASE::FIRST,
 				SPI_DUPLEX::FULL, SPI_FRAME_FORMAT::MSB_FIRST, SPI_DATA_SIZE::BITS_8, true );
-	LLPD::usart_log( USART_NUM::USART_3, "spi initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "spi initialized..." );
 
 	// audio timer setup (for 40 kHz sampling rate at 72 MHz system clock)
 	LLPD::tim6_counter_setup( 0, 1800, 40000 );
 	LLPD::tim3_counter_setup( 0, 1800, 40000 );
 	LLPD::tim6_counter_enable_interrupts();
-	LLPD::usart_log( USART_NUM::USART_3, "tim6 initialized..." );
-	LLPD::usart_log( USART_NUM::USART_3, "tim3 initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "tim6 initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "tim3 initialized..." );
 
 	// set up audio buffer for use with adc and dac dma
 	AudioBuffer<uint16_t> audioBuffer;
@@ -253,7 +258,7 @@ int main(void)
 	// DAC setup
 	// LLPD::dac_init( true ); // for interrupt based audio
 	// LLPD::dac_init_use_dma( true, ABUFFER_SIZE * 2, (uint16_t*) audioBuffer.getBuffer1() );
-	// LLPD::usart_log( USART_NUM::USART_3, "dac initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "dac initialized..." );
 
 	// No longer using op amp since using spi adc/dac external board
 	// Op Amp setup
@@ -261,14 +266,14 @@ int main(void)
 	// LLPD::gpio_analog_setup( OP_AMP_PORT, OP_AMP_OUTPUT_PIN );
 	// LLPD::gpio_analog_setup( OP_AMP_PORT, OP_AMP_NON_INVERT_PIN );
 	// LLPD::opamp_init();
-	// LLPD::usart_log( USART_NUM::USART_3, "op amp initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "op amp initialized..." );
 
 	// audio timer start
 	LLPD::tim6_counter_start();
 	LLPD::tim3_counter_start();
 	LLPD::tim3_sync_to_tim6();
-	LLPD::usart_log( USART_NUM::USART_3, "tim6 started..." );
-	LLPD::usart_log( USART_NUM::USART_3, "tim3 started..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "tim6 started..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "tim3 started..." );
 
 	// ADC setup (note, this must be done after the tim6_counter_start() call since it uses the delay function)
 	LLPD::rcc_pll_enable( RCC_CLOCK_SOURCE::INTERNAL, false, RCC_PLL_MULTIPLY::NONE );
@@ -283,7 +288,7 @@ int main(void)
 	// 				EFFECT1_ADC_CHANNEL, EFFECT2_ADC_CHANNEL, EFFECT3_ADC_CHANNEL, AUDIO_IN_CHANNEL );
 	LLPD::adc_set_channel_order( true, 4, AUDIO_IN_CHANNEL, (uint32_t*) audioBuffer.getBuffer1(), ABUFFER_SIZE * 2,
 					EFFECT1_ADC_CHANNEL, EFFECT2_ADC_CHANNEL, EFFECT3_ADC_CHANNEL, AUDIO_IN_CHANNEL );
-	LLPD::usart_log( USART_NUM::USART_3, "adc initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "adc initialized..." );
 
 	// pushbutton setup
 	LLPD::gpio_digital_input_setup( EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN, GPIO_PUPD::PULL_UP );
@@ -311,11 +316,11 @@ int main(void)
 			sram3Verification[0] == 25 && sram3Verification[1] == 16 && sram3Verification[2] == 8 &&
 			sram4Verification[0] == 25 && sram4Verification[1] == 16 && sram4Verification[2] == 8 )
 	{
-		LLPD::usart_log( USART_NUM::USART_3, "srams verified..." );
+		// LLPD::usart_log( MIDI_USART_NUM, "srams verified..." );
 	}
 	else
 	{
-		LLPD::usart_log( USART_NUM::USART_3, "WARNING!!! srams failed verification..." );
+		// LLPD::usart_log( MIDI_USART_NUM, "WARNING!!! srams failed verification..." );
 	}
 	srams.setSequentialMode( true );
 	srams.setDmaMode( &LLPD::spi2_dma_tx_tc_callback, &LLPD::spi2_dma_rx_tc_callback );
@@ -332,9 +337,13 @@ int main(void)
 	eepromAddressConfigs.emplace_back( EEPROM2_ADDRESS );
 	Eeprom_CAT24C64_Manager_Glint eeproms( I2C_NUM::I2C_2, eepromAddressConfigs );
 
+	// setup midi handler
+	MidiHandler midiHandler;
+	midiHandlerPtr = &midiHandler;
+
 	PresetManager presetManager( sizeof(GlintPresetHeader), 20, &eeproms );
 
-	GlintManager glintManager( &srams, &presetManager );
+	GlintManager glintManager( &srams, &midiHandler, &presetManager );
 	GlintUiManager glintUiManager( Smoll_data, GlintMainImage_data );
 
 	// upgrade presets if necessary (scope to save on memory)
@@ -348,7 +357,7 @@ int main(void)
 	glintManager.loadCurrentPreset();
 
 	Oled_Manager oled( glintUiManager.getFrameBuffer()->getPixels() );
-	LLPD::usart_log( USART_NUM::USART_3, "oled initialized..." );
+	// LLPD::usart_log( MIDI_USART_NUM, "oled initialized..." );
 
 	// initial drawing of the UI
 	glintUiManager.draw();
@@ -368,10 +377,12 @@ int main(void)
 	LLPD::gpio_output_set( SPI_DAC_ADC_CS_PORT, SPI_DAC_ADC_CS_PIN, false );
 	LLPD::spi1_dma_master_start( const_cast<uint16_t*>( audioBuffer.getBuffer1() ), ABUFFER_SIZE * 2 );
 
-	LLPD::usart_log( USART_NUM::USART_3, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
+	// LLPD::usart_log( MIDI_USART_NUM, "Gen_FX_SYN setup complete, entering while loop -------------------------------" );
 
 	while ( true )
 	{
+		midiHandler.dispatchEvents();
+
 		glintUiManager.processEffect1Btn( ! LLPD::gpio_input_get(EFFECT1_BUTTON_PORT, EFFECT1_BUTTON_PIN) );
 		glintUiManager.processEffect2Btn( ! LLPD::gpio_input_get(EFFECT2_BUTTON_PORT, EFFECT2_BUTTON_PIN) );
 
@@ -381,11 +392,11 @@ int main(void)
 
 		uint16_t pot2Val = LLPD::adc_get_channel_value( EFFECT2_ADC_CHANNEL );
 		float pot2Percentage = static_cast<float>( pot2Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT1)) );
+		IPotEventListener::PublishEvent( PotEvent(pot2Percentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT2)) );
 
 		uint16_t pot3Val = LLPD::adc_get_channel_value( EFFECT3_ADC_CHANNEL );
 		float pot3Percentage = static_cast<float>( pot3Val ) * ( 1.0f / 4095.0f );
-		IPotEventListener::PublishEvent( PotEvent(pot3Percentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT1)) );
+		IPotEventListener::PublishEvent( PotEvent(pot3Percentage, static_cast<unsigned int>(POT_CHANNEL::EFFECT3)) );
 
 		// code for interrupt based audio
 		// audioBuffer.pollToFillBuffers();
@@ -410,6 +421,22 @@ int main(void)
 			// fill buffer 1
 			audioBuffer.triggerCallbacksOnNextPoll( true );
 			audioBuffer.pollToFillBuffers();
+		}
+
+		// tick for button holding
+		glintUiManager.tickForEffectBtn2Hold( LLPD::tim6_get_elapsed_microseconds() );
+
+		// midi output
+		MidiEvent* outputMessage = midiHandler.nextOutputMidiMessage();
+
+		while ( outputMessage != nullptr )
+		{
+			for ( unsigned int byteNum = 0; byteNum < outputMessage->getNumBytes(); byteNum++ )
+			{
+				LLPD::usart_transmit( MIDI_USART_NUM, outputMessage->getRawData()[byteNum] );
+			}
+
+			outputMessage = midiHandler.nextOutputMidiMessage();
 		}
 	}
 }
@@ -436,18 +463,18 @@ extern "C" void TIM6_DAC_IRQHandler (void)
 
 extern "C" void USART3_IRQHandler (void)
 {
-	/*
-	// loopback test code for usart recieve
-	uint16_t data = LLPD::usart_receive( USART_NUM::USART_3 );
-	LLPD::usart_transmit( USART_NUM::USART_3, data );
-	*/
+	uint16_t data = LLPD::usart_receive( MIDI_USART_NUM );
+	if ( midiHandlerPtr )
+	{
+		midiHandlerPtr->processByte( data );
+	}
 }
 
 extern "C" void HardFault_Handler (void)
 {
 	while (1)
 	{
-		// LLPD::usart_log( USART_NUM::USART_3, "Hard Faulting -----------------------------" );
+		// LLPD::usart_log( MIDI_USART_NUM, "Hard Faulting -----------------------------" );
 	}
 }
 
@@ -455,7 +482,7 @@ extern "C" void MemManage_Handler (void)
 {
 	while (1)
 	{
-		// LLPD::usart_log( USART_NUM::USART_3, "Mem Manage Faulting -----------------------------" );
+		// LLPD::usart_log( MIDI_USART_NUM, "Mem Manage Faulting -----------------------------" );
 	}
 }
 
@@ -463,7 +490,7 @@ extern "C" void BusFault_Handler (void)
 {
 	while (1)
 	{
-		// LLPD::usart_log( USART_NUM::USART_3, "Bus Faulting -----------------------------" );
+		// LLPD::usart_log( MIDI_USART_NUM, "Bus Faulting -----------------------------" );
 	}
 }
 
@@ -471,6 +498,6 @@ extern "C" void UsageFault_Handler (void)
 {
 	while (1)
 	{
-		// LLPD::usart_log( USART_NUM::USART_3, "Usage Faulting -----------------------------" );
+		// LLPD::usart_log( MIDI_USART_NUM, "Usage Faulting -----------------------------" );
 	}
 }

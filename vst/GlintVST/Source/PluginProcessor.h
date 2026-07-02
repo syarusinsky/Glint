@@ -15,6 +15,7 @@
 #include "IGlintLCDRefreshEventListener.hpp"
 #include "SampleRateConverter.hpp"
 #include "PresetManager.hpp"
+#include "MidiHandler.hpp"
 
 #include <JuceHeader.h>
 
@@ -77,6 +78,7 @@ private:
     FakeStorageDevice fakeStorageDevice;
 
     PresetManager presetManager;
+    MidiHandler midiHandler;
 
     GlintManager glintManager;
     GlintUiManager glintUiManager;

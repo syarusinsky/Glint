@@ -4,10 +4,11 @@
 EventDispatcher<IGlintPresetEventListener, GlintPresetEvent,
 		&IGlintPresetEventListener::onGlintPresetChangedEvent> IGlintPresetEventListener::m_EventDispatcher;
 
-GlintPresetEvent::GlintPresetEvent (const GlintState& preset, unsigned int presetNum, unsigned int channel) :
+GlintPresetEvent::GlintPresetEvent (const GlintState& preset, unsigned int presetNum, unsigned int channel, const GlintPresetEventTypeEnum& type) :
 	IEvent( channel ),
 	m_Preset( preset ),
-	m_PresetNum( presetNum )
+	m_PresetNum( presetNum ),
+	m_Type( type )
 {
 }
 

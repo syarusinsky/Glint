@@ -23,7 +23,8 @@ GlintVSTAudioProcessor::GlintVSTAudioProcessor()
     : sAudioBuffer(),
       fakeStorageDevice( Sram_23K256::SRAM_SIZE * 4 ), // sram size on Gen_FX_SYN boards, with four srams installed
       presetManager( sizeof(GlintPresetHeader), 20, new CPPFile("GlintPresets.spf") ),
-      glintManager( &fakeStorageDevice, &presetManager ),
+      midiHandler(),
+      glintManager( &fakeStorageDevice, &midiHandler, &presetManager ),
       glintUiManager( Smoll_data, GlintMainImage_data ),
       sampleRateConverter( 96000, SAMPLE_RATE, 512 ),
       undoManager(),
@@ -225,6 +226,62 @@ void GlintVSTAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         }
     }
 
+        // handle midi input
+    // TODO remove after testing
+    if ( midiMessages.getNumEvents() > 0 )
+    {
+        std::cout << "STARTING MIDI IN PROCESSING ----------------" << std::endl;
+    }
+    for ( const auto& messageMetaData : midiMessages )
+    {
+        // midi input
+        const auto& message = messageMetaData.getMessage();
+
+        if ( message.getRawData()[0] != 0xF0 )
+        {
+            continue;
+        }
+
+        if (  message.getRawData()[2] != glintManager.getDevId() ) // if it has the same dev id, it was looped back
+        {
+            // TODO remove after testing
+            std::cout << "   MIDI IN: " <<  message.getDescription() << std::endl;
+            for ( int byte = 0; byte < message.getRawDataSize(); byte++ )
+            {
+                midiHandler.processByte( message.getRawData()[byte] );
+            }
+
+            midiHandler.dispatchEvents();
+        }
+        else
+        {
+            std::cout << "   LOOPED BACK MIDI IN???: " <<  message.getDescription() << std::endl;
+        }
+    }
+
+    // handle midi output
+    // TODO remove after testing
+    static bool startedHandling = false;
+    startedHandling = true;
+    MidiEvent* outputMessage = midiHandler.nextOutputMidiMessage();
+
+    while ( outputMessage != nullptr )
+    {
+        // TODO remove after testing
+        if ( startedHandling == true )
+        {
+            std::cout << "STARTING MIDI OUT PROCESSING ----------------" << std::endl;
+            startedHandling = false;
+        }
+        juce::MidiMessage juceMsg( outputMessage->getRawData(), outputMessage->getNumBytes() );
+        // TODO remove after testing
+        std::cout << "   MIDI OUT: " << juceMsg.getDescription() << std::endl;
+        midiMessages.addEvent( juceMsg, 0 );
+
+        outputMessage = midiHandler.nextOutputMidiMessage();
+    }
+
+
     this->dispatchEventsForIds( processorId, processorEditorId );
 }
 
@@ -294,6 +351,7 @@ void GlintVSTAudioProcessor::dispatchEventsForIds (const unsigned int processorI
     // be called before IGlintLCDRefreshEventListener. The onus is on the user to sequence these correctly in the most performant way possible.
     EventDispatcher<IPotEventListener, PotEvent, &IPotEventListener::onPotEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
     EventDispatcher<IButtonEventListener, ButtonEvent, &IButtonEventListener::onButtonEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
+    EventDispatcher<ISalSysexEventListener, SalSysexEvent, &ISalSysexEventListener::onSalSysexEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
     EventDispatcher<IGlintParameterEventListener, GlintParameterEvent,
                     &IGlintParameterEventListener::onGlintParameterEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
     EventDispatcher<IGlintPresetEventListener, GlintPresetEvent,

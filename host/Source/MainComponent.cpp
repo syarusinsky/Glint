@@ -29,10 +29,14 @@
 
 //==============================================================================
 MainComponent::MainComponent() :
+	lastInputIndex( 0 ),
+	lastOutputIndex( 0 ),
+	activeMidiOutput(),
 	sAudioBuffer(),
 	fakeStorageDevice( Sram_23K256::SRAM_SIZE * 4 ), // sram size on Gen_FX_SYN boards, with four srams installed
 	presetManager( sizeof(GlintPresetHeader), 20, new CPPFile("GlintPresets.spf") ),
-	glintManager( &fakeStorageDevice, &presetManager ),
+	midiHandler(),
+	glintManager( &fakeStorageDevice, &midiHandler, &presetManager ),
 	glintUiManager( Smoll_data, GlintMainImage_data ),
 	sampleRateConverter( 96000, SAMPLE_RATE, 512 ),
 	writer(),
@@ -44,6 +48,10 @@ MainComponent::MainComponent() :
 	effect3Lbl(),
 	effect1Btn( "Effect 1" ),
 	effect2Btn( "Effect 2" ),
+	midiInputList(),
+	midiInputListLbl(),
+	midiOutputList(),
+	midiOutputListLbl(),
 	audioSettingsBtn( "Audio Settings" ),
 	audioSettingsComponent( deviceManager, 2, 2, &audioSettingsBtn ),
 	screenRep( juce::Image::RGB, 256, 128, true ) // this is actually double the size so we can actually see it
@@ -98,6 +106,53 @@ MainComponent::MainComponent() :
 	addAndMakeVisible( effect2Btn );
 	effect2Btn.addListener( this );
 
+	addAndMakeVisible( midiInputList );
+	midiInputList.setTextWhenNoChoicesAvailable( "No MIDI Inputs Enabled" );
+	auto midiInputs = juce::MidiInput::getAvailableDevices();
+	juce::StringArray midiInputNames;
+	for ( const auto& input : midiInputs )
+	{
+		midiInputNames.add( input.name );
+	}
+	midiInputList.addItemList( midiInputNames, 1 );
+	midiInputList.onChange = [this] { setMidiInput (midiInputList.getSelectedItemIndex()); };
+	// find the first enabled device and use that by default
+	bool deviceFound = false;
+	for ( unsigned int i = 0; i < midiInputs.size(); i++ )
+	{
+		if ( deviceManager.isMidiInputDeviceEnabled(midiInputs[i].identifier) )
+		{
+			setMidiInput( i );
+			deviceFound = true;
+			break;
+		}
+	}
+	// if no enabled devices were found just use the first one in the list
+	if ( ! deviceFound && ! midiInputs.isEmpty() )
+		setMidiInput( 0 );
+
+	addAndMakeVisible( midiInputListLbl );
+	midiInputListLbl.setText( "Midi Input Device", juce::dontSendNotification );
+	midiInputListLbl.attachToComponent( &midiInputList, true );
+
+	addAndMakeVisible( midiOutputList );
+	midiOutputList.setTextWhenNoChoicesAvailable( "No MIDI Inputs Enabled" );
+	auto midiOutputs = juce::MidiOutput::getAvailableDevices();
+	juce::StringArray midiOutputNames;
+	for ( const auto& output : midiOutputs )
+	{
+		midiOutputNames.add( output.name );
+	}
+	midiOutputList.addItemList( midiOutputNames, 1 );
+	midiOutputList.onChange = [this] { setMidiOutput (midiOutputList.getSelectedItemIndex()); };
+	// if no enabled devices were found just use the first one in the list
+	if ( midiOutputs.isEmpty() )
+		setMidiOutput( 0 );
+
+	addAndMakeVisible( midiOutputListLbl );
+	midiOutputListLbl.setText( "Midi Output Device", juce::dontSendNotification );
+	midiOutputListLbl.attachToComponent( &midiOutputList, true );
+
 	addAndMakeVisible( audioSettingsBtn );
 	audioSettingsBtn.addListener( this );
 
@@ -110,7 +165,7 @@ MainComponent::MainComponent() :
 	GlintPresetUpgrader presetUpgrader( initPreset, glintManager.getPresetHeader() );
 	presetManager.upgradePresets( &presetUpgrader );
 
-	// start timer for fake loading
+	// start timer for button holding
 	this->startTimer( 33 );
 
 	sAudioBuffer.registerCallback( &glintManager );
@@ -130,6 +185,8 @@ MainComponent::~MainComponent()
 
 void MainComponent::timerCallback()
 {
+	glintUiManager.tickForEffectBtn2Hold( 33000.0f );
+
 	glintUiManager.processEffect1Btn( effect1Btn.isDown() );
 	glintUiManager.processEffect2Btn( effect2Btn.isDown() );
 	double effect1Val = effect1Sldr.getValue();
@@ -209,6 +266,9 @@ void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& buffe
 		{
 			outBufferR[sample] = outBufferL[sample];
 		}
+
+		// handle midi-out
+		this->handleOutgoingMidiMessages();
 	}
 	catch ( std::exception& e )
 	{
@@ -246,6 +306,8 @@ void MainComponent::resized()
 	effect1Btn.setBounds      	(sliderLeft, 300, (getWidth() / 2) - sliderLeft - 10, 20);
 	effect2Btn.setBounds      	(sliderLeft, 340, (getWidth() / 2) - sliderLeft - 10, 20);
 	audioSettingsBtn.setBounds 	(sliderLeft, 950, getWidth() - sliderLeft - 10, 20);
+	midiInputList.setBounds 	(sliderLeft, 980, getWidth() - sliderLeft - 10, 20);
+	midiOutputList.setBounds 	(sliderLeft, 1000, getWidth() - sliderLeft - 10, 20);
 }
 
 bool MainComponent::keyPressed (const juce::KeyPress& k)
@@ -363,4 +425,72 @@ void MainComponent::copyFrameBufferToImage (unsigned int xStart, unsigned int yS
 			}
 		}
 	}
+}
+
+void MainComponent::setMidiInput (int index)
+{
+	auto list = juce::MidiInput::getAvailableDevices();
+
+	deviceManager.removeMidiInputDeviceCallback( list[lastInputIndex].identifier, this );
+
+	auto newInput = list[index];
+
+	if ( !deviceManager.isMidiInputDeviceEnabled(newInput.identifier) )
+		deviceManager.setMidiInputDeviceEnabled( newInput.identifier, true );
+
+	deviceManager.addMidiInputDeviceCallback( newInput.identifier, this );
+	midiInputList.setSelectedId ( index + 1, juce::dontSendNotification );
+
+	lastInputIndex = index;
+}
+
+void MainComponent::setMidiOutput (int index)
+{
+	auto list = juce::MidiOutput::getAvailableDevices();
+
+	auto newOutput = list[index];
+
+	if ( activeMidiOutput != nullptr )
+		activeMidiOutput.reset();
+
+	activeMidiOutput = juce::MidiOutput::openDevice( newOutput.identifier );
+
+	lastOutputIndex = index;
+}
+
+void MainComponent::handleIncomingMidiMessage (juce::MidiInput *source, const juce::MidiMessage &message)
+{
+	juce::MessageManager::callAsync( [this, message]()
+	{
+		// TODO remove after testing
+		// std::cout << "MESSAGE IN: " << message.getDescription() << std::endl;
+		for ( int byte = 0; byte < message.getRawDataSize(); byte++ )
+		{
+			midiHandler.processByte( message.getRawData()[byte] );
+		}
+
+		midiHandler.dispatchEvents();
+	} );
+}
+
+void MainComponent::handleOutgoingMidiMessages()
+{
+	juce::MessageManager::callAsync( [this]()
+	{
+		MidiEvent* outputMessage = midiHandler.nextOutputMidiMessage();
+
+		while ( outputMessage != nullptr )
+		{
+			juce::MidiMessage juceMsg( outputMessage->getRawData(), outputMessage->getNumBytes() );
+			// TODO remove after testing
+			// std::cout << "MESSAGE OUT: " << juceMsg.getDescription() << std::endl;
+
+			if ( activeMidiOutput != nullptr )
+			{
+				activeMidiOutput->sendMessageNow( juceMsg );
+			}
+
+			outputMessage = midiHandler.nextOutputMidiMessage();
+		}
+	} );
 }
