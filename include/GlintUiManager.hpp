@@ -25,7 +25,7 @@ class Sprite;
 class GlintUiManager : public Surface, public IPotEventListener, public IButtonEventListener, public IGlintPresetEventListener
 {
 	public:
-		GlintUiManager (uint8_t* fontData, uint8_t* mainImageData);
+		GlintUiManager (const uint8_t* const fontData, const uint8_t* const mainImageData);
 		~GlintUiManager() override;
 
 		void draw() override;

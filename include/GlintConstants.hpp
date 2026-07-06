@@ -7,20 +7,20 @@
 
 constexpr uint8_t GLINT_MODEL_ID = 0x01;
 
-const unsigned int GLINT_DIFFUSE_LEN_1 = 109;
-const unsigned int GLINT_DIFFUSE_LEN_2 = 151;
-const unsigned int GLINT_DIFFUSE_LEN_3 = 293;
-const unsigned int GLINT_DIFFUSE_LEN_4 = 373;
+const unsigned int GLINT_DIFFUSE_LEN_1 = 149;
+const unsigned int GLINT_DIFFUSE_LEN_2 = 211;
+const unsigned int GLINT_DIFFUSE_LEN_3 = 331;
+const unsigned int GLINT_DIFFUSE_LEN_4 = 431;
 
-const unsigned int GLINT_REVERBNET1_APF_LEN_1 = 1511;
-const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 957;
-const unsigned int GLINT_REVERBNET1_APF_LEN_3 = 487;
-const unsigned int GLINT_REVERBNET1_APF_LEN_4 = 549;
-const unsigned int GLINT_REVERBNET2_APF_LEN_1 = 451;
-const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 1553;
-const unsigned int GLINT_REVERBNET2_APF_LEN_3 = 807;
-const unsigned int GLINT_REVERBNET2_APF_LEN_4 = 2187;
-const unsigned int GLINT_REVERBNET_SMAF_LEN   = 3537;
+const unsigned int GLINT_REVERBNET1_APF_LEN_1 = 613;
+const unsigned int GLINT_REVERBNET1_APF_LEN_2 = 883;
+const unsigned int GLINT_REVERBNET1_APF_LEN_3 = 1153;
+const unsigned int GLINT_REVERBNET1_APF_LEN_4 = 1429;
+const unsigned int GLINT_REVERBNET2_APF_LEN_1 = 1601;
+const unsigned int GLINT_REVERBNET2_APF_LEN_2 = 1907;
+const unsigned int GLINT_REVERBNET2_APF_LEN_3 = 2309;
+const unsigned int GLINT_REVERBNET2_APF_LEN_4 = 2713;
+const unsigned int GLINT_REVERBNET_SMAF_LEN   = 7507;
 
 const float GLINT_MAX_FILT_FREQ = 20000.0f;
 const float GLINT_MIN_FILT_FREQ = 1.0f;

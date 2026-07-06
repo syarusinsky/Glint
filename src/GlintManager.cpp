@@ -9,7 +9,6 @@
 #include <string.h>
 #include <cmath>
 #include <algorithm>
-#include <random>
 
 unsigned int GlintStorageAllpassCombFilter::m_RunningDelayLineOffset = 0;
 
@@ -44,7 +43,8 @@ GlintManager::GlintManager (STORAGE* delayBufferStorage, MidiHandler* midiHandle
 	m_PresetToSendOrReceive( this->getState() ),
 	m_PresetToSendOrReceiveNum( 0 ),
 	m_DevId( 0 ),
-	m_SenderId( 0 )
+	m_SenderId( 0 ),
+	m_RandomGen()
 {
 	this->bindToGlintParameterEventSystem();
 	this->bindToSalSysexEventSystem();
@@ -134,60 +134,49 @@ void GlintManager::call (uint16_t* writeBuffer)
 	m_ReverbNetBlock2APF3.setFeedbackGain( m_DecayTime );
 	m_ReverbNetBlock2APF4.setFeedbackGain( m_DecayTime );
 
-	// attenuate samples to maximize headroom and feedback from reverb network
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+	for ( unsigned int sampleNum = 0; sampleNum < ABUFFER_SIZE; sampleNum++ )
 	{
-		writeBufferInt16[sample] = writeBufferInt16[sample] + m_PrevReverbNetVals[sample];
-	}
+		// feed back the previous reverb net value and increase headroom
+		const int32_t sampleVal = ( (writeBufferInt16[sampleNum]) / 2 ) + ( m_PrevReverbNetVals[sampleNum] / 2 );
 
-	// // lowpass stage
-	m_LowpassFilter.call( writeBufferInt16 );
+		// low-pass stage
+		const int16_t lowPassOut = m_LowpassFilter.processSample( sampleVal );
 
-	// diffusion stage
-	m_DiffusionAPF1.call( writeBufferInt16 );
-	m_DiffusionAPF2.call( writeBufferInt16 );
-	m_DiffusionAPF3.call( writeBufferInt16 );
-	m_DiffusionAPF4.call( writeBufferInt16 );
+		// diffusion stage
+		int16_t diffusionOut = m_DiffusionAPF1.processSample( lowPassOut );
+		diffusionOut = m_DiffusionAPF2.processSample( diffusionOut );
+		diffusionOut = m_DiffusionAPF3.processSample( diffusionOut );
+		diffusionOut = m_DiffusionAPF4.processSample( diffusionOut );
 
-	// sample vals will be the actual output, but we also need to calculate the reverb net output values for feedback
-	memcpy( m_PrevReverbNetVals, writeBufferInt16, ABUFFER_SIZE * sizeof(int16_t) );
+		// reverb network 1 stage
+		int16_t net1Out = m_ReverbNetBlock1APF1.processSample( diffusionOut );
+		net1Out = m_ReverbNetBlock1APF2.processSample( net1Out );
+		net1Out = m_ReverbNetBlock1APF3.processSample( net1Out );
+		net1Out = m_ReverbNetBlock1APF4.processSample( net1Out );
+		net1Out = m_ReverbNetStorageMediaAPF.processSample( net1Out );
 
-	// feedback from reverb network block 2
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-	{
-		m_PrevReverbNetVals[sample] = ( m_PrevReverbNetVals[sample] - m_PrevReverbNetBlock2Vals[sample] ) * 0.5f;
-	}
+		// reverb network 2 stage
+		int16_t net2Out = m_ReverbNetBlock2APF1.processSample( net1Out );
+		net2Out = m_ReverbNetBlock2APF2.processSample( net2Out );
+		net2Out = m_ReverbNetBlock2APF3.processSample( net2Out );
+		net2Out = m_ReverbNetBlock2APF4.processSample( net2Out );
 
-	// reverberation network stage
-	m_ReverbNetBlock1APF1.call( m_PrevReverbNetVals );
-	m_ReverbNetBlock1APF2.call( m_PrevReverbNetVals );
-	m_ReverbNetBlock1APF3.call( m_PrevReverbNetVals );
-	m_ReverbNetBlock1APF4.call( m_PrevReverbNetVals );
-	m_ReverbNetStorageMediaAPF.call( m_PrevReverbNetVals );
-	// decay the reverb network samples
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-	{
-		m_PrevReverbNetVals[sample] *= m_DecayTime;
-	}
-	// m_PrevReverbNetVals will be the actual output of the reverb network stage, but we also need to calculate the second block for feedback
-	memcpy( m_PrevReverbNetBlock2Vals, m_PrevReverbNetVals, ABUFFER_SIZE * sizeof(int16_t) );
-	m_ReverbNetBlock2APF1.call( m_PrevReverbNetBlock2Vals );
-	m_ReverbNetBlock2APF2.call( m_PrevReverbNetBlock2Vals );
-	m_ReverbNetBlock2APF3.call( m_PrevReverbNetBlock2Vals );
-	m_ReverbNetBlock2APF4.call( m_PrevReverbNetBlock2Vals );
+		// network 2 feedback stage and decay
+		int32_t feedbackVal = static_cast<int32_t>( net1Out ) - static_cast<int32_t>( net2Out );
+		m_PrevReverbNetVals[sampleNum] = static_cast<int16_t>( feedbackVal * m_DecayTime );
 
-	// offset samples to fit into dac range
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-	{
-		// for hardware dac
-		// writeBufferInt16[sample] = ( std::abs(writeBufferInt16[sample] + 2047) - std::abs(writeBufferInt16[sample] - 2047) ) / 2;
-		// writeBufferInt16[sample] += 2047;
+		// recover headroom
+		int32_t outVal = ( static_cast<int32_t>(diffusionOut) * 2 ) + 32767;
 
-		// for spi dac
-		writeBufferInt16[sample] = ( std::abs(writeBufferInt16[sample] + 32767) - std::abs(writeBufferInt16[sample] - 32767) ) / 2;
-		writeBufferInt16[sample] += 32767;
+		// clamp for hardware dac
+		// if ( outVal > 4095 ) outVal = 4095;
+		// if ( outVal < 0 ) outVal = 0;
 
-		// TODO might need to be modified if it's producing dc offset??? Check with vst plugin before pushing
+		// clamp for spi dac
+		if ( outVal > 65535 ) outVal = 65535;
+		if ( outVal < 0 ) outVal = 0;
+
+		writeBuffer[sampleNum] = static_cast<uint16_t>( outVal );
 	}
 }
 
@@ -513,12 +502,10 @@ void GlintManager::onSalSysexEvent (const SalSysexEvent& salSysexEvent)
 
 uint8_t GlintManager::generateRandomDevId()
 {
-	// generate a random device id
-	std::random_device rd;
-	std::mt19937 gen( rd() );
-	std::uniform_int_distribution<int> distrib( 0x01, 0x7E ); // 0x7F since it must be a data byte instead of a status byte, ranges so that dev id and sender id are never zero
+	// return distrib( gen );
+	const float randF = m_RandomGen.nextFloat();
 
-	return distrib( gen );
+	return ( randF * (0x7E - 0x01) ) + 0x01; // a value between 0x01 and 0x7E, since it must be a data byte instead of a status byte and so that dev id and sender id are never zero
 }
 
 uint16_t GlintManager::getNumNibblesInPreset()

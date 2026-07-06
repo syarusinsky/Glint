@@ -85,8 +85,6 @@ CFLAGS += -Wfloat-conversion
 CFLAGS += -fsingle-precision-constant
 # (set error messages to appear on a single line.)
 CFLAGS += -fmessage-length=0
-# (set system to ignore semihosted junk)
-CFLAGS += -specs=nosys.specs
 CFLAGS += -fno-exceptions
 CFLAGS += -fno-rtti
 CFLAGS += -ffunction-sections
@@ -101,8 +99,12 @@ CFLAGS += -DROTATE_DISPLAY_180_DEGREES
 LSCRIPT = ./$(LD_SCRIPT)
 LFLAGS =  $(CFLAGS)
 LFLAGS += -lstdc++_nano
+LFLAGS += -specs=nano.specs
+LFLAGS += -specs=nosys.specs
 LFLAGS += -Wl,--gc-sections
 LFLAGS += -T$(LSCRIPT)
+# to print the memory map, since we're concerned with optimizing memory to maximize reverb time
+LFLAGS += -Wl,-Map=$(TARGET)_release.map,--cref,--print-memory-usage
 
 # assembly files to compile
 AS_SRC = ./$(STM32_CUBE_FILES_DIR)/startup_$(VARIANT).s
@@ -170,5 +172,7 @@ clean:
 	rm -f $(DEBUG_OBJS)
 	rm -f $(TARGET)_release.elf
 	rm -f $(TARGET)_release.bin
+	rm -f $(TARGET)_release.map
 	rm -f $(TARGET)_debug.elf
 	rm -f $(TARGET)_debug.bin
+	rm -f $(TARGET)_debug.map

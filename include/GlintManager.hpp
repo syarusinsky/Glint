@@ -11,6 +11,7 @@
 #include "SimpleDelay.hpp"
 #include "PolyBLEPOsc.hpp"
 #include "NoiseGate.hpp"
+#include "FastRandom.hpp"
 
 #include <stdint.h>
 
@@ -74,7 +75,8 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 			m_DelayLineOffset( m_RunningDelayLineOffset ),
 			m_SharedData( SharedData<uint8_t>::MakeSharedData(ABUFFER_SIZE * sizeof(int16_t), sharedData) ),
 			m_Feedback( 0.8f ),
-			m_DmaStage( DmaStage::SEQUENCE_COMPLETE )
+			m_DmaStage( DmaStage::SEQUENCE_COMPLETE ),
+			m_SampleNum( ABUFFER_SIZE )
 		{
 #ifdef TARGET_BUILD
 			delayBufferStorage->setDmaTransferCompleteCallback( std::bind(&GlintStorageAllpassCombFilter::dmaTransferCompleteCallback, this) );
@@ -99,26 +101,28 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 
 		int16_t processSample (int16_t sampleVal)
 		{
-			// read delayed value
-			unsigned int readOffset = ( m_DelayLineOffset + m_DelayReadIncr ) * sizeof(int16_t);
-			uint8_t readByte1 = m_DelayBuffer->readByte( readOffset );
-			uint8_t readByte2 = m_DelayBuffer->readByte( readOffset + 1 );
-			int16_t delayedVal = ( readByte1 << 8 ) | ( readByte2 );
+			if ( m_SampleNum == ABUFFER_SIZE )
+			{
+				this->waitForDmaSequenceComplete();
+			}
 
-			// write current sample value
-			int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
+			// write read data into writeBuffer
+			int16_t* readDataPtr = reinterpret_cast<int16_t*>( m_SharedData.getPtr() );
+			int16_t delayedVal = readDataPtr[m_SampleNum];
+
+			// use the same buffer (readData) to write to
+			const int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
 			delayedVal = ( (newSampleVal * m_Feedback) + delayedVal );
-			int16_t outVal = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
-			unsigned int writeOffset = ( m_DelayLineOffset + m_DelayWriteIncr ) * sizeof(int16_t);
-			uint8_t writeByte1 = ( sampleVal >> 8 );
-			uint8_t writeByte2 = ( sampleVal & 0b11111111 );
-			m_DelayBuffer->writeByte( writeOffset, writeByte1 );
-			m_DelayBuffer->writeByte( writeOffset + 1, writeByte2 );
+			readDataPtr[m_SampleNum] = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
 
-			m_DelayWriteIncr = ( m_DelayWriteIncr + 1 ) % m_DelayLength;
-			m_DelayReadIncr = ( m_DelayReadIncr + 1 ) % m_DelayLength;
+			m_SampleNum++;
 
-			return outVal;
+			if ( m_SampleNum == ABUFFER_SIZE )
+			{
+				this->finishProcessingBlock();
+			}
+
+			return delayedVal;
 		}
 
 		void setDelayLength (unsigned int delayLength)
@@ -135,7 +139,6 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 		{
 			if ( m_DmaStage == DmaStage::WRITING_FIRST_HALF )
 			{
-				const unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
 				const unsigned int startWriteIndex = m_DelayWriteIncr;
 				const unsigned int firstHalfSize = m_DelayLength - startWriteIndex;
 				const unsigned int secondHalfSize = ABUFFER_SIZE - firstHalfSize;
@@ -193,50 +196,17 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 			}
 		}
 
-		void call (int16_t* writeBuffer) override
+		bool waitForDmaSequenceComplete()
 		{
+			m_SampleNum = 0;
 #ifdef TARGET_BUILD // using dma
-			// wait for transfer complete
 			while ( m_DmaStage != DmaStage::SEQUENCE_COMPLETE ) {}
 
-			// write read data into writeBuffer
-			int16_t* readDataPtr = reinterpret_cast<int16_t*>( m_SharedData.getPtr() );
-			for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
-			{
-				int16_t delayedVal = readDataPtr[sample];
+			return true;
 
-				// use the same buffer (readData) to write to
-				int16_t sampleVal = writeBuffer[sample];
-				int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
-				delayedVal = ( (newSampleVal * m_Feedback) + delayedVal );
-				readDataPtr[sample] = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
+#else // no dma on host
+			// for host build we just grab the buffers from memory
 
-				// write the delayed value to the actual write buffer
-				writeBuffer[sample] = delayedVal;
-			}
-
-			const unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
-			const unsigned int startWriteIndex = m_DelayWriteIncr;
-
-			if ( endWriteIndex < startWriteIndex && endWriteIndex != 0 )
-			{
-				// we need to wrap around the delay buffer
-				unsigned int firstHalfSize = m_DelayLength - startWriteIndex;
-				const SharedData<uint8_t> firstHalf
-					= SharedData<uint8_t>::MakeSharedData( firstHalfSize * sizeof(int16_t), m_SharedData.getPtr() );
-
-				// write first half to media
-				m_DmaStage = DmaStage::WRITING_FIRST_HALF;
-				m_DelayBuffer->writeToMedia( firstHalf, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
-			}
-			else // endWriteIndex > startWriteIndex
-			{
-				// we can just write contiguous samples
-				m_DmaStage = DmaStage::WRITING_FINISHING;
-				m_DelayBuffer->writeToMedia( m_SharedData, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
-			}
-
-#else // no dma on host build
 			const unsigned int endIndex = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
 			const unsigned int startIndex = m_DelayReadIncr;
 
@@ -261,19 +231,35 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 				m_DelayBuffer->readFromMedia( (m_DelayLineOffset + startIndex) * sizeof(int16_t), m_SharedData );
 			}
 
-			// write read data into writeBuffer
-			int16_t* readDataPtr = reinterpret_cast<int16_t*>( m_SharedData.getPtr() );
-			for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+			return true;
+#endif
+		}
+
+		void finishProcessingBlock()
+		{
+#ifdef TARGET_BUILD // using dma
+			const unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
+			const unsigned int startWriteIndex = m_DelayWriteIncr;
+
+			if ( endWriteIndex < startWriteIndex && endWriteIndex != 0 )
 			{
-				int16_t delayedVal = readDataPtr[sample];
+				// we need to wrap around the delay buffer
+				unsigned int firstHalfSize = m_DelayLength - startWriteIndex;
+				const SharedData<uint8_t> firstHalf
+					= SharedData<uint8_t>::MakeSharedData( firstHalfSize * sizeof(int16_t), m_SharedData.getPtr() );
 
-				// use the same buffer (readData) to write to
-				readDataPtr[sample] = ( writeBuffer[sample] + static_cast<int16_t>(delayedVal * m_Feedback) ) / 2;
-
-				// write the delayed value to the actual write buffer
-				writeBuffer[sample] = delayedVal;
+				// write first half to media
+				m_DmaStage = DmaStage::WRITING_FIRST_HALF;
+				m_DelayBuffer->writeToMedia( firstHalf, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
+			}
+			else // endWriteIndex > startWriteIndex
+			{
+				// we can just write contiguous samples
+				m_DmaStage = DmaStage::WRITING_FINISHING;
+				m_DelayBuffer->writeToMedia( m_SharedData, (m_DelayLineOffset + startWriteIndex) * sizeof(int16_t) );
 			}
 
+#else // no dma on host
 			const unsigned int endWriteIndex = ( m_DelayWriteIncr + ABUFFER_SIZE ) % m_DelayLength;
 			const unsigned int startWriteIndex = m_DelayWriteIncr;
 
@@ -301,6 +287,29 @@ class GlintStorageAllpassCombFilter : public IBufferCallback<int16_t>
 			m_DelayReadIncr = ( m_DelayReadIncr + ABUFFER_SIZE ) % m_DelayLength;
 #endif
 		}
+
+		void call (int16_t* writeBuffer) override
+		{
+			this->waitForDmaSequenceComplete();
+
+			// write read data into writeBuffer
+			int16_t* readDataPtr = reinterpret_cast<int16_t*>( m_SharedData.getPtr() );
+			for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+			{
+				int16_t delayedVal = readDataPtr[sample];
+
+				// use the same buffer (readData) to write to
+				int16_t sampleVal = writeBuffer[sample];
+				int16_t newSampleVal = ( sampleVal - (delayedVal * m_Feedback) );
+				delayedVal = ( (newSampleVal * m_Feedback) + delayedVal );
+				readDataPtr[sample] = ( delayedVal * (m_Feedback + 0.087f) ) + ( sampleVal * (1.0f - (m_Feedback + 0.087f)) );
+
+				// write the delayed value to the actual write buffer
+				writeBuffer[sample] = delayedVal;
+			}
+
+			this->finishProcessingBlock();
+		}
 private:
 		unsigned int 			m_DelayLength;
 		STORAGE* 			m_DelayBuffer;
@@ -311,6 +320,7 @@ private:
 		const SharedData<uint8_t> 	m_SharedData; // we'll have to use another block of memory since we're so limited
 		float 				m_Feedback;
 		volatile DmaStage 		m_DmaStage;
+		unsigned int 			m_SampleNum; // only for use with process sample, must call waitForSequenceComplete before processing block!
 };
 
 class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEventListener, public ISalSysexEventListener
@@ -383,6 +393,8 @@ class GlintManager : public IBufferCallback<uint16_t>, public IGlintParameterEve
 		uint8_t 			m_RequestedPresetNum;
 		bool 				m_SendingOrReceivingAllPresets = false;
 		unsigned int 			m_NibbleIndex = 0;
+
+		FastRandom 			m_RandomGen;
 
 		uint8_t generateRandomDevId();
 		uint16_t getNumNibblesInPreset();

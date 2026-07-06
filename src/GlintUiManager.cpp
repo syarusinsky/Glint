@@ -9,10 +9,10 @@
 #include "IButtonEventListener.hpp"
 #include "SRAM_23K256.hpp"
 
-GlintUiManager::GlintUiManager (uint8_t* fontData, uint8_t* mainImageData) :
+GlintUiManager::GlintUiManager (const uint8_t* const fontData, const uint8_t* const mainImageData) :
 	Surface( 128, 64, CP_FORMAT::MONOCHROME_1BIT ),
-	m_Font( new Font(fontData) ),
-	m_MainImage( new Sprite(mainImageData) ),
+	m_Font( new Font(const_cast<uint8_t*>(fontData)) ),
+	m_MainImage( new Sprite(const_cast<uint8_t*>(mainImageData)) ),
 	m_CurrentMenu( GLINT_MENUS::MAIN ),
 	m_Effect1BtnState( BUTTON_STATE::FLOATING ),
 	m_Effect2BtnState( BUTTON_STATE::FLOATING ),
