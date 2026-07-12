@@ -182,10 +182,10 @@ void GlintManager::call (uint16_t* writeBuffer)
 		int32_t outVal = ( static_cast<int32_t>(diffusionOut) << 1 ) + 32767;
 
 		// clamp for hardware dac
-		// outVal = std::clamp( outVal, 0, 4095 );
+		// outVal = std::clamp<int32_t>( outVal, 0, 4095 );
 
 		// clamp for spi dac
-		outVal = std::clamp( outVal, 0, 65535 );
+		outVal = std::clamp<int32_t>( outVal, 0, 65535 );
 
 		writeBuffer[sampleNum] = static_cast<uint16_t>( outVal );
 	}
