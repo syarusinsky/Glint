@@ -324,10 +324,10 @@ void GlintVSTAudioProcessor::setStateInformation (const void* data, int sizeInBy
 
             // set initial values
             juce::AudioParameterFloat* e1 = dynamic_cast<juce::AudioParameterFloat*>( apvts.getParameter("effect1") );
-            juce::AudioParameterInt* e2 = dynamic_cast<juce::AudioParameterInt*>( apvts.getParameter("effect2") );
+            juce::AudioParameterFloat* e2 = dynamic_cast<juce::AudioParameterFloat*>( apvts.getParameter("effect2") );
             juce::AudioParameterInt* e3 = dynamic_cast<juce::AudioParameterInt*>( apvts.getParameter("effect3") );
             juce::Range<float> e1Range = e1->getNormalisableRange().getRange();
-            juce::Range<int> e2Range = e2->getRange();
+            juce::Range<float> e2Range = e2->getNormalisableRange().getRange();
             juce::Range<int> e3Range = e3->getRange();
             float effect1SldrPercentage = ( e1->get() - e1Range.getStart()) / (e1Range.getEnd() - e1Range.getStart() );
             float effect2SldrPercentage = ( e2->get() - e2Range.getStart()) / (e2Range.getEnd() - e2Range.getStart() );
