@@ -50,6 +50,7 @@ GlintManager::GlintManager (STORAGE* delayBufferStorage, MidiHandler* midiHandle
 	this->bindToSalSysexEventSystem();
 
 	m_ReverbNetModOsc.setOscillatorMode( OscillatorMode::SINE );
+	m_ReverbNetModOsc.setFrequency( 1.2f );
 }
 
 GlintManager::~GlintManager()
@@ -136,17 +137,28 @@ void GlintManager::call (uint16_t* writeBuffer)
 
 	for ( unsigned int sampleNum = 0; sampleNum < ABUFFER_SIZE; sampleNum++ )
 	{
-		// feed back the previous reverb net value and increase headroom
-		const int32_t sampleVal = ( (writeBufferInt16[sampleNum]) / 2 ) + ( m_PrevReverbNetVals[sampleNum] / 2 );
-
-		// low-pass stage
-		const int16_t lowPassOut = m_LowpassFilter.processSample( sampleVal );
+		// feed back the previous reverb net value and increase headroom by bitshifting
+		const int32_t combinedVal = static_cast<int32_t>( writeBufferInt16[sampleNum] ) + static_cast<int32_t>( m_PrevReverbNetVals[sampleNum] );
+		const int16_t sampleVal = static_cast<int16_t>( combinedVal >> 1 );
 
 		// diffusion stage
-		int16_t diffusionOut = m_DiffusionAPF1.processSample( lowPassOut );
+		int16_t diffusionOut = m_DiffusionAPF1.processSample( sampleVal );
 		diffusionOut = m_DiffusionAPF2.processSample( diffusionOut );
 		diffusionOut = m_DiffusionAPF3.processSample( diffusionOut );
 		diffusionOut = m_DiffusionAPF4.processSample( diffusionOut );
+
+		// modulate delay lines
+		constexpr unsigned int modDepth1 = 43;
+		constexpr unsigned int modDepth2 = 39;
+		const float modVal = ( m_ReverbNetModOsc.nextSample() + 1.0f ) * 0.5f; // to put in the 0.0f to 1.0f range
+		m_ReverbNetBlock1APF1.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_1 - modDepth1) + (modDepth1 * modVal)) );
+		m_ReverbNetBlock1APF2.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_2 - modDepth1) + (modDepth1 * modVal)) );
+		m_ReverbNetBlock1APF3.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_3 - modDepth1) + (modDepth1 * modVal)) );
+		m_ReverbNetBlock1APF4.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_4 - modDepth1) + (modDepth1 * modVal)) );
+		m_ReverbNetBlock2APF1.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_1 - modDepth2) + (modDepth2 * modVal)) );
+		m_ReverbNetBlock2APF2.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_2 - modDepth2) + (modDepth2 * modVal)) );
+		m_ReverbNetBlock2APF3.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_3 - modDepth2) + (modDepth2 * modVal)) );
+		m_ReverbNetBlock2APF4.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_4 - modDepth2) + (modDepth2 * modVal)) );
 
 		// reverb network 1 stage
 		int16_t net1Out = m_ReverbNetBlock1APF1.processSample( diffusionOut );
@@ -161,20 +173,19 @@ void GlintManager::call (uint16_t* writeBuffer)
 		net2Out = m_ReverbNetBlock2APF3.processSample( net2Out );
 		net2Out = m_ReverbNetBlock2APF4.processSample( net2Out );
 
-		// network 2 feedback stage and decay
-		int32_t feedbackVal = static_cast<int32_t>( net1Out ) - static_cast<int32_t>( net2Out );
-		m_PrevReverbNetVals[sampleNum] = static_cast<int16_t>( feedbackVal * m_DecayTime );
+		// network 2 feedback stage, low-pass stage, and decay
+		const int32_t feedbackVal = static_cast<int32_t>( net1Out ) - static_cast<int32_t>( net2Out );
+		const int32_t lowPassOut = m_LowpassFilter.processSample( feedbackVal );
+		m_PrevReverbNetVals[sampleNum] = static_cast<int16_t>( lowPassOut * m_DecayTime );
 
 		// recover headroom
-		int32_t outVal = ( static_cast<int32_t>(diffusionOut) * 2 ) + 32767;
+		int32_t outVal = ( static_cast<int32_t>(diffusionOut) << 1 ) + 32767;
 
 		// clamp for hardware dac
-		// if ( outVal > 4095 ) outVal = 4095;
-		// if ( outVal < 0 ) outVal = 0;
+		// outVal = std::clamp( outVal, 0, 4095 );
 
 		// clamp for spi dac
-		if ( outVal > 65535 ) outVal = 65535;
-		if ( outVal < 0 ) outVal = 0;
+		outVal = std::clamp( outVal, 0, 65535 );
 
 		writeBuffer[sampleNum] = static_cast<uint16_t>( outVal );
 	}
