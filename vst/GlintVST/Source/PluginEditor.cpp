@@ -70,6 +70,8 @@ GlintVSTAudioProcessorEditor::GlintVSTAudioProcessorEditor (GlintVSTAudioProcess
 
 GlintVSTAudioProcessorEditor::~GlintVSTAudioProcessorEditor()
 {
+    this->unbindFromGlintLCDRefreshEventSystem();
+    this->unbindFromGlintPresetEventSystem();
 }
 
 void GlintVSTAudioProcessorEditor::timerCallback()

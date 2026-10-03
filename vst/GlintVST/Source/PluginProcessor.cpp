@@ -308,7 +308,11 @@ void GlintVSTAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // as intermediaries to make it easy to save and load complex data.
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
-    copyXmlToBinary (*xml, destData);
+
+    if (xml != nullptr)
+    {
+        copyXmlToBinary (*xml, destData);
+    }
 }
 
 void GlintVSTAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -320,7 +324,11 @@ void GlintVSTAudioProcessor::setStateInformation (const void* data, int sizeInBy
     {
         if (xmlState->hasTagName (apvts.state.getType()))
         {
-            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+            auto newTree = juce::ValueTree::fromXml (*xmlState);
+            if (newTree.isValid())
+            {
+                apvts.replaceState (newTree);
+            }
 
             // set initial values
             juce::AudioParameterFloat* e1 = dynamic_cast<juce::AudioParameterFloat*>( apvts.getParameter("effect1") );
