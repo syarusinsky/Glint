@@ -14,6 +14,7 @@ GlintUiManager::GlintUiManager (const uint8_t* const fontData, const uint8_t* co
 	m_Font( new Font(const_cast<uint8_t*>(fontData)) ),
 	m_MainImage( new Sprite(const_cast<uint8_t*>(mainImageData)) ),
 	m_CurrentMenu( GLINT_MENUS::MAIN ),
+	m_CurrentPresetNum( 0 ),
 	m_Effect1BtnState( BUTTON_STATE::FLOATING ),
 	m_Effect2BtnState( BUTTON_STATE::FLOATING ),
 	m_Effect1PotCached( 0.0f ),
@@ -62,6 +63,8 @@ void GlintUiManager::draw()
 
 void GlintUiManager::onGlintPresetChangedEvent (const GlintPresetEvent& presetEvent)
 {
+	m_CurrentPresetNum = presetEvent.getPresetNum();
+
 	if ( presetEvent.getType() == GlintPresetEventTypeEnum::LOAD_PRESET )
 	{
 		this->lockAllPots();
@@ -78,11 +81,11 @@ void GlintUiManager::onGlintPresetChangedEvent (const GlintPresetEvent& presetEv
 	}
 	else if ( presetEvent.getType() == GlintPresetEventTypeEnum::ACCEPT_PRESET )
 	{
-		this->switchToReceivingMenu( false );
+		this->switchToReceivingMenu( false, presetEvent.getPresetNum() + 1 );
 	}
 	else if ( presetEvent.getType() == GlintPresetEventTypeEnum::ACCEPT_ALL_PRESETS )
 	{
-		this->switchToReceivingMenu( true );
+		this->switchToReceivingMenu( true, presetEvent.getPresetNum() + 1 );
 	}
 	else if ( presetEvent.getType() == GlintPresetEventTypeEnum::DENY_PRESET )
 	{
@@ -305,7 +308,7 @@ void GlintUiManager::handleEffect1SinglePress()
 	{
 		IGlintParameterEventListener::PublishEvent( GlintParameterEvent(0.0f, static_cast<unsigned int>(PARAM_CHANNEL::SEND_PRESET)) );
 
-		this->switchToSendingMenu( false );
+		this->switchToSendingMenu( false, m_CurrentPresetNum + 1 );
 	}
 	else if ( m_CurrentMenu == GLINT_MENUS::RECEIVER )
 	{
@@ -343,7 +346,7 @@ void GlintUiManager::handleDoubleButtonPress()
 	{
 		IGlintParameterEventListener::PublishEvent( GlintParameterEvent(0.0f, static_cast<unsigned int>(PARAM_CHANNEL::SEND_ALL_PRESETS)) );
 
-		this->switchToSendingMenu( true );
+		this->switchToSendingMenu( true, 1 );
 	}
 }
 
@@ -620,7 +623,7 @@ void GlintUiManager::switchToReceiverMenu (bool receiveAllPresets)
 	IGlintLCDRefreshEventListener::PublishEvent( GlintLCDRefreshEvent(0, 0, m_FrameBuffer->getWidth(), m_FrameBuffer->getHeight(), 0) );
 }
 
-void GlintUiManager::switchToSendingMenu (bool sendAllPresets)
+void GlintUiManager::switchToSendingMenu (bool sendAllPresets, unsigned int presetNum )
 {
 	m_CurrentMenu = GLINT_MENUS::SENDING;
 
@@ -640,7 +643,7 @@ void GlintUiManager::switchToSendingMenu (bool sendAllPresets)
 	IGlintLCDRefreshEventListener::PublishEvent( GlintLCDRefreshEvent(0, 0, m_FrameBuffer->getWidth(), m_FrameBuffer->getHeight(), 0) );
 }
 
-void GlintUiManager::switchToReceivingMenu (bool receiveAllPresets)
+void GlintUiManager::switchToReceivingMenu (bool receiveAllPresets, unsigned int presetNum )
 {
 	m_CurrentMenu = GLINT_MENUS::SENDING;
 
@@ -651,10 +654,12 @@ void GlintUiManager::switchToReceivingMenu (bool receiveAllPresets)
 	if ( ! receiveAllPresets )
 	{
 		m_Graphics->drawText( 0.05f, 0.4f,  "receiving preset", 1.0f );
+		m_Graphics->drawText( 0.45f, 0.6f,  std::to_string(presetNum + 1).c_str(), 1.0f );
 	}
 	else // sending all presets
 	{
 		m_Graphics->drawText( 0.05f, 0.4f,  "receiving presets", 1.0f );
+		m_Graphics->drawText( 0.45f, 0.6f,  std::to_string(presetNum + 1).c_str(), 1.0f );
 	}
 
 	IGlintLCDRefreshEventListener::PublishEvent( GlintLCDRefreshEvent(0, 0, m_FrameBuffer->getWidth(), m_FrameBuffer->getHeight(), 0) );

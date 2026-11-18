@@ -104,90 +104,93 @@ GlintPresetHeader GlintManager::getPresetHeader()
 
 void GlintManager::call (uint16_t* writeBuffer)
 {
-	int16_t* writeBufferInt16 = reinterpret_cast<int16_t*>( writeBuffer );
-
-	// first offset for noise gate
-	for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+	if ( ! m_SendingOrReceivingAllPresets )
 	{
-		// for hardware dac
-		// writeBufferInt16[sample] -= 2047;
+		int16_t* writeBufferInt16 = reinterpret_cast<int16_t*>( writeBuffer );
 
-		// for spi dac
-		writeBufferInt16[sample] -= 32767;
-	}
+		// first offset for noise gate
+		for ( unsigned int sample = 0; sample < ABUFFER_SIZE; sample++ )
+		{
+			// for hardware dac
+			// writeBufferInt16[sample] -= 2047;
 
-	m_NoiseGate.call( writeBufferInt16 );
+			// for spi dac
+			writeBufferInt16[sample] -= 32767;
+		}
 
-	m_LowpassFilter.setCoefficients( m_FiltFreq );
+		m_NoiseGate.call( writeBufferInt16 );
 
-	m_DiffusionAPF1.setFeedbackGain( m_Diffusion );
-	m_DiffusionAPF2.setFeedbackGain( m_Diffusion );
-	m_DiffusionAPF3.setFeedbackGain( m_Diffusion );
-	m_DiffusionAPF4.setFeedbackGain( m_Diffusion );
+		m_LowpassFilter.setCoefficients( m_FiltFreq );
 
-	m_ReverbNetBlock1APF1.setFeedbackGain( m_DecayTime );
-	m_ReverbNetBlock1APF2.setFeedbackGain( m_DecayTime );
-	m_ReverbNetBlock1APF3.setFeedbackGain( m_DecayTime );
-	m_ReverbNetBlock1APF4.setFeedbackGain( m_DecayTime );
-	m_ReverbNetStorageMediaAPF.setFeedback( m_DecayTime );
-	m_ReverbNetBlock2APF1.setFeedbackGain( m_DecayTime );
-	m_ReverbNetBlock2APF2.setFeedbackGain( m_DecayTime );
-	m_ReverbNetBlock2APF3.setFeedbackGain( m_DecayTime );
-	m_ReverbNetBlock2APF4.setFeedbackGain( m_DecayTime );
+		m_DiffusionAPF1.setFeedbackGain( m_Diffusion );
+		m_DiffusionAPF2.setFeedbackGain( m_Diffusion );
+		m_DiffusionAPF3.setFeedbackGain( m_Diffusion );
+		m_DiffusionAPF4.setFeedbackGain( m_Diffusion );
 
-	for ( unsigned int sampleNum = 0; sampleNum < ABUFFER_SIZE; sampleNum++ )
-	{
-		// feed back the previous reverb net value and increase headroom by bitshifting
-		const int32_t combinedVal = static_cast<int32_t>( writeBufferInt16[sampleNum] ) + static_cast<int32_t>( m_PrevReverbNetVals[sampleNum] );
-		const int16_t sampleVal = static_cast<int16_t>( combinedVal >> 1 );
+		m_ReverbNetBlock1APF1.setFeedbackGain( m_DecayTime );
+		m_ReverbNetBlock1APF2.setFeedbackGain( m_DecayTime );
+		m_ReverbNetBlock1APF3.setFeedbackGain( m_DecayTime );
+		m_ReverbNetBlock1APF4.setFeedbackGain( m_DecayTime );
+		m_ReverbNetStorageMediaAPF.setFeedback( m_DecayTime );
+		m_ReverbNetBlock2APF1.setFeedbackGain( m_DecayTime );
+		m_ReverbNetBlock2APF2.setFeedbackGain( m_DecayTime );
+		m_ReverbNetBlock2APF3.setFeedbackGain( m_DecayTime );
+		m_ReverbNetBlock2APF4.setFeedbackGain( m_DecayTime );
 
-		// diffusion stage
-		int16_t diffusionOut = m_DiffusionAPF1.processSample( sampleVal );
-		diffusionOut = m_DiffusionAPF2.processSample( diffusionOut );
-		diffusionOut = m_DiffusionAPF3.processSample( diffusionOut );
-		diffusionOut = m_DiffusionAPF4.processSample( diffusionOut );
+		for ( unsigned int sampleNum = 0; sampleNum < ABUFFER_SIZE; sampleNum++ )
+		{
+			// feed back the previous reverb net value and increase headroom by bitshifting
+			const int32_t combinedVal = static_cast<int32_t>( writeBufferInt16[sampleNum] ) + static_cast<int32_t>( m_PrevReverbNetVals[sampleNum] );
+			const int16_t sampleVal = static_cast<int16_t>( combinedVal >> 1 );
 
-		// modulate delay lines
-		constexpr unsigned int modDepth1 = 43;
-		constexpr unsigned int modDepth2 = 39;
-		const float modVal = ( m_ReverbNetModOsc.nextSample() + 1.0f ) * 0.5f; // to put in the 0.0f to 1.0f range
-		m_ReverbNetBlock1APF1.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_1 - modDepth1) + (modDepth1 * modVal)) );
-		m_ReverbNetBlock1APF2.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_2 - modDepth1) + (modDepth1 * modVal)) );
-		m_ReverbNetBlock1APF3.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_3 - modDepth1) + (modDepth1 * modVal)) );
-		m_ReverbNetBlock1APF4.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_4 - modDepth1) + (modDepth1 * modVal)) );
-		m_ReverbNetBlock2APF1.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_1 - modDepth2) + (modDepth2 * modVal)) );
-		m_ReverbNetBlock2APF2.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_2 - modDepth2) + (modDepth2 * modVal)) );
-		m_ReverbNetBlock2APF3.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_3 - modDepth2) + (modDepth2 * modVal)) );
-		m_ReverbNetBlock2APF4.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_4 - modDepth2) + (modDepth2 * modVal)) );
+			// diffusion stage
+			int16_t diffusionOut = m_DiffusionAPF1.processSample( sampleVal );
+			diffusionOut = m_DiffusionAPF2.processSample( diffusionOut );
+			diffusionOut = m_DiffusionAPF3.processSample( diffusionOut );
+			diffusionOut = m_DiffusionAPF4.processSample( diffusionOut );
 
-		// reverb network 1 stage
-		int16_t net1Out = m_ReverbNetBlock1APF1.processSample( diffusionOut );
-		net1Out = m_ReverbNetBlock1APF2.processSample( net1Out );
-		net1Out = m_ReverbNetBlock1APF3.processSample( net1Out );
-		net1Out = m_ReverbNetBlock1APF4.processSample( net1Out );
-		net1Out = m_ReverbNetStorageMediaAPF.processSample( net1Out );
+			// modulate delay lines
+			constexpr unsigned int modDepth1 = 43;
+			constexpr unsigned int modDepth2 = 39;
+			const float modVal = ( m_ReverbNetModOsc.nextSample() + 1.0f ) * 0.5f; // to put in the 0.0f to 1.0f range
+			m_ReverbNetBlock1APF1.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_1 - modDepth1) + (modDepth1 * modVal)) );
+			m_ReverbNetBlock1APF2.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_2 - modDepth1) + (modDepth1 * modVal)) );
+			m_ReverbNetBlock1APF3.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_3 - modDepth1) + (modDepth1 * modVal)) );
+			m_ReverbNetBlock1APF4.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET1_APF_LEN_4 - modDepth1) + (modDepth1 * modVal)) );
+			m_ReverbNetBlock2APF1.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_1 - modDepth2) + (modDepth2 * modVal)) );
+			m_ReverbNetBlock2APF2.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_2 - modDepth2) + (modDepth2 * modVal)) );
+			m_ReverbNetBlock2APF3.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_3 - modDepth2) + (modDepth2 * modVal)) );
+			m_ReverbNetBlock2APF4.setDelayLength( static_cast<unsigned int>((GLINT_REVERBNET2_APF_LEN_4 - modDepth2) + (modDepth2 * modVal)) );
 
-		// reverb network 2 stage
-		int16_t net2Out = m_ReverbNetBlock2APF1.processSample( net1Out );
-		net2Out = m_ReverbNetBlock2APF2.processSample( net2Out );
-		net2Out = m_ReverbNetBlock2APF3.processSample( net2Out );
-		net2Out = m_ReverbNetBlock2APF4.processSample( net2Out );
+			// reverb network 1 stage
+			int16_t net1Out = m_ReverbNetBlock1APF1.processSample( diffusionOut );
+			net1Out = m_ReverbNetBlock1APF2.processSample( net1Out );
+			net1Out = m_ReverbNetBlock1APF3.processSample( net1Out );
+			net1Out = m_ReverbNetBlock1APF4.processSample( net1Out );
+			net1Out = m_ReverbNetStorageMediaAPF.processSample( net1Out );
 
-		// network 2 feedback stage, low-pass stage, and decay
-		const int32_t feedbackVal = static_cast<int32_t>( net1Out ) - static_cast<int32_t>( net2Out );
-		const int32_t lowPassOut = m_LowpassFilter.processSample( feedbackVal );
-		m_PrevReverbNetVals[sampleNum] = static_cast<int16_t>( lowPassOut * m_DecayTime );
+			// reverb network 2 stage
+			int16_t net2Out = m_ReverbNetBlock2APF1.processSample( net1Out );
+			net2Out = m_ReverbNetBlock2APF2.processSample( net2Out );
+			net2Out = m_ReverbNetBlock2APF3.processSample( net2Out );
+			net2Out = m_ReverbNetBlock2APF4.processSample( net2Out );
 
-		// recover headroom
-		int32_t outVal = ( static_cast<int32_t>(diffusionOut) << 1 ) + 32767;
+			// network 2 feedback stage, low-pass stage, and decay
+			const int32_t feedbackVal = static_cast<int32_t>( net1Out ) - static_cast<int32_t>( net2Out );
+			const int32_t lowPassOut = m_LowpassFilter.processSample( feedbackVal );
+			m_PrevReverbNetVals[sampleNum] = static_cast<int16_t>( lowPassOut * m_DecayTime );
 
-		// clamp for hardware dac
-		// outVal = std::clamp<int32_t>( outVal, 0, 4095 );
+			// recover headroom
+			int32_t outVal = ( static_cast<int32_t>(diffusionOut) << 1 ) + 32767;
 
-		// clamp for spi dac
-		outVal = std::clamp<int32_t>( outVal, 0, 65535 );
+			// clamp for hardware dac
+			// outVal = std::clamp<int32_t>( outVal, 0, 4095 );
 
-		writeBuffer[sampleNum] = static_cast<uint16_t>( outVal );
+			// clamp for spi dac
+			outVal = std::clamp<int32_t>( outVal, 0, 65535 );
+
+			writeBuffer[sampleNum] = static_cast<uint16_t>( outVal );
+		}
 	}
 }
 
@@ -320,24 +323,11 @@ void GlintManager::onSalSysexEvent (const SalSysexEvent& salSysexEvent)
 	}
 	else if ( m_DevId == salSysexEvent.getRecId() && (m_SenderId == 0 || m_SenderId == salSysexEvent.getDevId()) ) // if preset exchange is in progress and ids match
 	{
-		if ( salSysexEvent.getType() == SalSysexTypeEnum::ACCEPT_PRESET_OR_PRESETS )
+		if ( salSysexEvent.getType() == SalSysexTypeEnum::ACCEPT_PRESET_OR_PRESETS && m_NibbleIndex != 0 )
 		{
-			// send the requested preset
-			// note that since sal has a limited midi message size, multiple preset chunks are usually necessary for a single preset
-			if ( m_SenderId == 0 )
-			{
-				m_SenderId = salSysexEvent.getDevId();
-			}
 			const uint16_t numNibblesInPreset = this->getNumNibblesInPreset();
 			const uint8_t requestedPresetNum = salSysexEvent.getPresetNum();
-			if ( m_SendingOrReceivingAllPresets )
-			{
-				m_PresetToSendOrReceive = m_PresetManager->retrievePreset<GlintState>( requestedPresetNum );
-			}
-			else
-			{
-				m_PresetToSendOrReceive = this->getState();
-			}
+
 			SalSysexEvent sendPresetDataChunkEvent
 				= SalSysexEvent::buildSendPresetDataChunkEvent( m_DevId, GLINT_MODEL_ID, m_SenderId, requestedPresetNum, numNibblesInPreset );
 
@@ -365,6 +355,20 @@ void GlintManager::onSalSysexEvent (const SalSysexEvent& salSysexEvent)
 				{
 					// successful write
 					m_NibbleIndex++;
+				}
+			}
+
+			if ( m_NibbleIndex == numNibblesInPreset )
+			{
+				if ( m_SendingOrReceivingAllPresets )
+				{
+					IGlintPresetEventListener::PublishEvent(
+							GlintPresetEvent(this->getState(), requestedPresetNum, 0, GlintPresetEventTypeEnum::SENT_PRESETS) );
+				}
+				else
+				{
+					IGlintPresetEventListener::PublishEvent(
+							GlintPresetEvent(this->getState(), requestedPresetNum, 0, GlintPresetEventTypeEnum::SENT_PRESET) );
 				}
 			}
 
@@ -412,7 +416,11 @@ void GlintManager::onSalSysexEvent (const SalSysexEvent& salSysexEvent)
 
 			if ( m_NibbleIndex == numNibblesInPreset )
 			{
-				// we have the full preset, send the received preset message
+				// we have the full preset, update ui and send the received preset message
+				IGlintPresetEventListener::PublishEvent(
+					GlintPresetEvent( this->getState(), salSysexEvent.getPresetNum(), 0,
+						m_SendingOrReceivingAllPresets ? GlintPresetEventTypeEnum::ACCEPT_ALL_PRESETS : GlintPresetEventTypeEnum::ACCEPT_PRESET )
+				);
 				m_NibbleIndex = 0; // reset since next preset we need to start at the first nibble
 				SalSysexEvent receivedPresetEvent
 					= SalSysexEvent::buildReceivedPresetEvent( m_DevId, GLINT_MODEL_ID, m_SenderId, requestedPresetNum, numNibblesInPreset );
@@ -434,6 +442,7 @@ void GlintManager::onSalSysexEvent (const SalSysexEvent& salSysexEvent)
 
 					m_DevId = 0;
 					m_SenderId = 0;
+					m_SendingOrReceivingAllPresets = false;
 				}
 
 				m_MidiHandler->processSalSysexEvent( receivedPresetEvent );
@@ -446,12 +455,19 @@ void GlintManager::onSalSysexEvent (const SalSysexEvent& salSysexEvent)
 				m_MidiHandler->processSalSysexEvent( acceptPresetOrPresetsEvent );
 			}
 		}
-		else if ( salSysexEvent.getType() == SalSysexTypeEnum::RECEIVED_PRESET )
+		else if ( (salSysexEvent.getType() == SalSysexTypeEnum::ACCEPT_PRESET_OR_PRESETS && m_NibbleIndex == 0)
+				|| salSysexEvent.getType() == SalSysexTypeEnum::RECEIVED_PRESET )
 		{
-			// send the next requested preset
+			// send either the first preset, or the next requested preset in the send all presets mode
 			// note that since sal has a limited midi message size, multiple preset chunks are usually necessary for a single preset
+			if ( m_SenderId == 0 )
+			{
+				m_SenderId = salSysexEvent.getDevId();
+			}
+
 			const uint16_t numNibblesInPreset = this->getNumNibblesInPreset();
-			const uint8_t requestedPresetNum = ( m_SendingOrReceivingAllPresets ) ? salSysexEvent.getPresetNum() + 1 : m_PresetManager->getMaxNumPresets();
+			const uint8_t requestedPresetNum = ( salSysexEvent.getType() != SalSysexTypeEnum::RECEIVED_PRESET ) ? salSysexEvent.getPresetNum() :
+								( m_SendingOrReceivingAllPresets ) ? salSysexEvent.getPresetNum() + 1 : m_PresetManager->getMaxNumPresets();
 
 			m_NibbleIndex = 0; // reset since next preset we need to start at the first nibble
 

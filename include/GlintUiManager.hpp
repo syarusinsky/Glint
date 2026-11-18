@@ -48,6 +48,8 @@ class GlintUiManager : public Surface, public IPotEventListener, public IButtonE
 
 		GLINT_MENUS 	m_CurrentMenu;
 
+		unsigned int 	m_CurrentPresetNum;
+
 		BUTTON_STATE 	m_Effect1BtnState;
 		BUTTON_STATE 	m_Effect2BtnState;
 
@@ -83,8 +85,8 @@ class GlintUiManager : public Surface, public IPotEventListener, public IButtonE
 		void switchToMainMenu();
 		void switchToSenderMenu();
 		void switchToReceiverMenu(bool receiveAllPresets);
-		void switchToSendingMenu (bool sendAllPresets);
-		void switchToReceivingMenu (bool receiveAllPresets);
+		void switchToSendingMenu (bool sendAllPresets, unsigned int currentPresetNum);
+		void switchToReceivingMenu (bool receiveAllPresets, unsigned int currentPresetNum);
 		void updateButtonState (BUTTON_STATE& buttonState, bool pressed);
 		void updateParameterString (float value, const POT_CHANNEL& channel);
 		void updatePresetString (const unsigned int presetNum);
