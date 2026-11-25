@@ -57,6 +57,9 @@ private:
     juce::TextButton effect1Btn;
     juce::TextButton effect2Btn;
 
+    juce::TextButton switchPresetBankBtn;
+    std::unique_ptr<juce::ParameterAttachment> switchPresetBankBtnAttachment;
+
     juce::Image screenRep;
 
     unsigned int processorEditorId;

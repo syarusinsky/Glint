@@ -11,7 +11,6 @@
 
 #include "GlintConstants.hpp"
 #include "GlintPresetUpgrader.hpp"
-#include "CPPFile.hpp"
 #include "SRAM_23K256.hpp"
 
 // assets
@@ -22,7 +21,8 @@
 GlintVSTAudioProcessor::GlintVSTAudioProcessor()
     : sAudioBuffer(),
       fakeStorageDevice( Sram_23K256::SRAM_SIZE * 4 ), // sram size on Gen_FX_SYN boards, with four srams installed
-      presetManager( sizeof(GlintPresetHeader), 20, new CPPFile("GlintPresets.spf") ),
+      presetFile( "GlintPresetsBank1.spf" ),
+      presetManager( sizeof(GlintPresetHeader), 20, &presetFile ),
       midiHandler(),
       glintManager( &fakeStorageDevice, &midiHandler, &presetManager ),
       glintUiManager( Smoll_data, GlintMainImage_data ),
@@ -32,6 +32,7 @@ GlintVSTAudioProcessor::GlintVSTAudioProcessor()
                                   { std::make_unique<AudioParameterFloat> ("effect1", "Decay Time", NormalisableRange<float> (0.0f, 1.0f), 0),
                                     std::make_unique<AudioParameterFloat> ("effect2", "Diffusion", NormalisableRange<float> (0.0f, 1.0f), 0),
                                     std::make_unique<AudioParameterInt> ("effect3", "Filter Freq", 1, 20000, 20000),
+                                    std::make_unique<AudioParameterInt> ("presetBank", "Preset Bank", 0, 2, 0)
                                   }),
       processorId( IEventListener::getGlobalJuceProcessorId() )
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -53,10 +54,7 @@ GlintVSTAudioProcessor::GlintVSTAudioProcessor()
     }
     fakeStorageDevice.writeToMedia( data, 0 );
 
-    // upgrade presets if necessary
-    GlintState initPreset = { 0.0f, 0.0f, 20000.0f };
-    GlintPresetUpgrader presetUpgrader( initPreset, glintManager.getPresetHeader() );
-    presetManager.upgradePresets( &presetUpgrader );
+    this->upgradePresetsIfNecessary();
 
     sAudioBuffer.registerCallback( &glintManager );
 }
@@ -330,6 +328,12 @@ void GlintVSTAudioProcessor::setStateInformation (const void* data, int sizeInBy
                 apvts.replaceState (newTree);
             }
 
+            if (apvts.state.hasProperty("presetBank"))
+            {
+                presetFile = CPPFile( "GlintPresetsBank" + std::to_string(static_cast<int> (*apvts.getRawParameterValue("presetBank")) + 1) +".spf" );
+                this->upgradePresetsIfNecessary();
+            }
+
             // set initial values
             juce::AudioParameterFloat* e1 = dynamic_cast<juce::AudioParameterFloat*>( apvts.getParameter("effect1") );
             juce::AudioParameterFloat* e2 = dynamic_cast<juce::AudioParameterFloat*>( apvts.getParameter("effect2") );
@@ -366,6 +370,29 @@ void GlintVSTAudioProcessor::dispatchEventsForIds (const unsigned int processorI
                     &IGlintPresetEventListener::onGlintPresetChangedEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
     EventDispatcher<IGlintLCDRefreshEventListener, GlintLCDRefreshEvent,
                     &IGlintLCDRefreshEventListener::onGlintLCDRefreshEvent>::juceDispatchQueuedEvents( processorId, processorEditorId );
+}
+
+void GlintVSTAudioProcessor::upgradePresetsIfNecessary()
+{
+    GlintState initPreset = { 0.0f, 0.0f, 20000.0f };
+    GlintPresetUpgrader presetUpgrader( initPreset, glintManager.getPresetHeader() );
+    presetManager.upgradePresets( &presetUpgrader );
+}
+
+void GlintVSTAudioProcessor::iterateThroughPresetBanks()
+{
+    if (auto* intParam = dynamic_cast<juce::AudioParameterInt*> (apvts.getParameter ("presetBank")))
+    {
+        int minVal = intParam->getRange().getStart();
+        int maxVal = intParam->getRange().getEnd();
+        int current = intParam->get();
+        int next = (current >= maxVal) ? minVal : (current + 1);
+        intParam->beginChangeGesture();
+        *intParam = next;
+        intParam->endChangeGesture();
+        presetFile = CPPFile( "GlintPresetsBank" + std::to_string(static_cast<int> (*apvts.getRawParameterValue("presetBank")) + 1) +".spf" );
+        this->upgradePresetsIfNecessary();
+    }
 }
 
 //==============================================================================

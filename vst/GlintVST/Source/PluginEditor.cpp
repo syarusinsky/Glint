@@ -26,6 +26,7 @@ GlintVSTAudioProcessorEditor::GlintVSTAudioProcessorEditor (GlintVSTAudioProcess
       effect3SldrAttachment( std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.getVTS(), "effect3", effect3Sldr) ),
       effect1Btn( "Effect 1" ),
       effect2Btn( "Effect 2" ),
+      switchPresetBankBtn( "Bank 1" ),
       screenRep( juce::Image::RGB, 256, 128, true ), // this is actually double the size so we can actually see it
       processorEditorId( IEventListener::getGlobalJuceProcessorId() )
 {
@@ -56,6 +57,22 @@ GlintVSTAudioProcessorEditor::GlintVSTAudioProcessorEditor (GlintVSTAudioProcess
 
     addAndMakeVisible( effect2Btn );
     effect2Btn.addListener( this );
+
+    addAndMakeVisible( switchPresetBankBtn );
+    switchPresetBankBtn.addListener( this );
+    if (auto* param = audioProcessor.getVTS().getParameter ("presetBank"))
+    {
+        switchPresetBankBtnAttachment = std::make_unique<juce::ParameterAttachment> (
+            *param,
+            [this] (float newValue)
+            {
+                int bankIndex = static_cast<int> (newValue);
+                switchPresetBankBtn.setButtonText ("Bank " + juce::String (bankIndex + 1));
+            },
+            nullptr
+        );
+        switchPresetBankBtnAttachment->sendInitialUpdate();
+    }
 
     setSize( 800, 600 );
 
@@ -117,11 +134,12 @@ void GlintVSTAudioProcessorEditor::paint (juce::Graphics& g)
 void GlintVSTAudioProcessorEditor::resized()
 {
     int sliderLeft = 120;
-    effect1Sldr.setBounds 	(sliderLeft, 20, getWidth() - sliderLeft - 10, 20);
-    effect2Sldr.setBounds 	(sliderLeft, 60, getWidth() - sliderLeft - 10, 20);
-    effect3Sldr.setBounds 	(sliderLeft, 100, getWidth() - sliderLeft - 10, 20);
-    effect1Btn.setBounds      	(sliderLeft, 300, (getWidth() / 2) - sliderLeft - 10, 20);
-    effect2Btn.setBounds      	(sliderLeft, 340, (getWidth() / 2) - sliderLeft - 10, 20);
+    effect1Sldr.setBounds 		(sliderLeft, 20, getWidth() - sliderLeft - 10, 20);
+    effect2Sldr.setBounds 		(sliderLeft, 60, getWidth() - sliderLeft - 10, 20);
+    effect3Sldr.setBounds 		(sliderLeft, 100, getWidth() - sliderLeft - 10, 20);
+    effect1Btn.setBounds      		(sliderLeft, 300, (getWidth() / 2) - sliderLeft - 10, 20);
+    effect2Btn.setBounds      		(sliderLeft, 340, (getWidth() / 2) - sliderLeft - 10, 20);
+    switchPresetBankBtn.setBounds 	(sliderLeft, 380, (getWidth() / 2) - sliderLeft - 10, 20);
 }
 
 void GlintVSTAudioProcessorEditor::sliderValueChanged (juce::Slider* slider)
@@ -130,6 +148,12 @@ void GlintVSTAudioProcessorEditor::sliderValueChanged (juce::Slider* slider)
 
 void GlintVSTAudioProcessorEditor::buttonClicked (juce::Button* button)
 {
+    // using timer callback to process effect inputs instead
+
+    if ( button == &switchPresetBankBtn )
+    {
+        audioProcessor.iterateThroughPresetBanks();
+    }
 }
 
 bool GlintVSTAudioProcessorEditor::keyPressed (const juce::KeyPress& k)
@@ -148,6 +172,10 @@ bool GlintVSTAudioProcessorEditor::keyPressed (const juce::KeyPress& k)
     {
         effect2Btn.setState( juce::Button::ButtonState::buttonDown );
     }
+    else if ( k.getTextCharacter() == '-' )
+    {
+        switchPresetBankBtn.setState( juce::Button::ButtonState::buttonDown );
+    }
 
     return true;
 }
@@ -158,6 +186,7 @@ bool GlintVSTAudioProcessorEditor::keyStateChanged (bool isKeyDown)
     {
         effect1Btn.setState( juce::Button::ButtonState::buttonNormal );
         effect2Btn.setState( juce::Button::ButtonState::buttonNormal );
+        switchPresetBankBtn.setState( juce::Button::ButtonState::buttonNormal );
     }
 
     return true;
