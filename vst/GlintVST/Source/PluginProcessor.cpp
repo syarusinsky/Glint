@@ -170,6 +170,14 @@ bool GlintVSTAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts)
 void GlintVSTAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // apparently some daws can give you buffers that aren't of the size given in prepare to play,
+    // I'd rather hear a click than deal with that
+    if ( buffer.getNumSamples() != sampleRateConverter.getSourceBufferSize() )
+    {
+        return;
+    }
+
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
